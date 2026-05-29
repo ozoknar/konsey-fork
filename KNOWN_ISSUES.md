@@ -7,6 +7,21 @@
 
 ## EN
 
+- **AI repair (`doctor --fix`) — path-scope is detection, not prevention.** The repair
+  worker runs tool-ON (claude acceptEdits / codex workspace-write / agy
+  `--dangerously-skip-permissions`) cwd-pinned to the repo; providers cannot finely scope
+  per-file. **The real containment is the provider sandbox** (codex `workspace-write` /
+  claude `acceptEdits` within `--add-dir` / agy `--sandbox`) + the cwd-pin — NOT the
+  post-run `gate_paths` check, which runs over `git status` and therefore only sees
+  IN-repo changes: a worker that writes `/tmp/x` or `~/.zshrc` is NOT detected by it (git
+  reports nothing outside the repo). `gate_paths` mainly catches an in-repo symlink whose
+  target resolves out, and even then can only refuse to continue + raise an incident — it
+  **cannot un-write** an already-edited file. Pre-run guards (default-OFF two-key opt-in,
+  cwd-pin, `exec_policy` hard-floor on the worker argv) reduce but do not eliminate this. agy is the
+  least-scopable provider and is the last-resort pick. A real tool-ON run is exercised only
+  via the opt-in `KONSEY_LIVE_REPAIR` smoke; unit tests use an injected runner. Do not run
+  `--fix` against a repo holding uncommitted work you cannot afford to lose (it refuses on a
+  dirty tree unless `--force`).
 - **node-isolation — Art. 2.6 enforcement deferred to PR2 (detection shipped).** A node
   subprocess (claude/codex/agy) currently inherits the full host environment
   (`adapters.py:_env`) and the host's AI instruction files (`CLAUDE.md`/`AGENTS.md`/

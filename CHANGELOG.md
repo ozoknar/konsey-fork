@@ -12,6 +12,20 @@ unverified "it works" claims. Test evidence is cited where it backs an entry.
 
 ### Added
 
+- **AI-assisted install repair — the first tool-ON execution primitive (Faz 2, opt-in).**
+  `council doctor --json` emits a structured, locale-independent report (`{schema, ok, rc,
+  critical, advisory, checks[]}`) from a single source of truth (`_doctor_collect`); the
+  pretty default is byte-identical. `council doctor --fix` (default **OFF** — needs
+  `KONSEY_REPAIR=1` **or** `--force` **and** a TTY confirm) may hand a broken install to a
+  sandboxed, repo-scoped provider via the new `council/repair.py`: a pure invocation
+  builder (claude `--permission-mode acceptEdits` / codex `-s workspace-write -a never` /
+  agy `--sandbox`, cwd-pinned, fail-closed env allow-list, secret-scrubbed prompt), an
+  `exec_policy` hard-floor gate, a post-run outside-repo path gate, and a bounded
+  (≤3 attempts, no-progress kill) loop that verifies success ONLY by re-running the real
+  doctor (producer≠verifier — the worker's "I fixed it" is not evidence), auditing every
+  attempt append-only. The worker profile is kept OUT of the council reasoning roster.
+  Verified by 24 new tests with an injected runner (no live agent); a real tool-ON smoke
+  is opt-in behind `KONSEY_LIVE_REPAIR`. This is the safe, bounded seam Faz 3 reuses.
 - **Node execution isolation — detection (Constitution Article 2.6, new).** A node that
   shells out to a provider CLI loads the *host machine's* AI config (`CLAUDE.md` /
   `AGENTS.md` / `GEMINI.md`, settings/hooks, MCP) — which collapses the cross-provider

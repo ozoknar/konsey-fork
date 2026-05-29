@@ -41,6 +41,7 @@ from .config import (
     load_config,
 )
 from .i18n import load_catalog, t
+from . import repair
 
 # ---------------------------------------------------------------------------
 # tiny terminal helpers (no color dependency; degrade to plain text)
@@ -557,11 +558,12 @@ def _doctor_host_isolation(cfg: Config, results: list[tuple[bool, str]]) -> None
                             n=len(findings), summary=summarize(findings))))
 
 
-def cmd_doctor(args: argparse.Namespace) -> int:
-    cfg = load_config()
+def _doctor_collect(cfg: Config) -> dict:
+    """Run every doctor probe and return a typed, locale-INDEPENDENT report (no printing).
+    Single source of truth for the pretty render, ``doctor --json``, and the repair loop's
+    producer≠verifier check. Severity mirrors the renderer's rule exactly (no drift)."""
     cat = load_catalog(cfg)
     results: list[tuple[bool, str]] = []
-
     state = t(cat, "cli.doctor.config_present") if cfg.config_path().exists() else t(cat, "cli.doctor.config_defaults")
     results.append((True, t(cat, "cli.doctor.config_line", path=cfg.config_path(), state=state)))
     results.append((True, t(cat, "cli.doctor.owner_line", owner=repr(cfg.owner), locale=cfg.locale, regime=cfg.data_regime)))
@@ -575,30 +577,62 @@ def cmd_doctor(args: argparse.Namespace) -> int:
     _doctor_regime(cfg, results)
     _doctor_host_isolation(cfg, results)
 
-    _emit(t(cat, "cli.doctor.header"))
-    critical_fail = False
-    for ok, line in results:
+    checks: list[dict] = []
+    critical = False
+    for i, (ok, msg) in enumerate(results):
         if not ok:
-            critical_fail = True
-            _emit(f"  {_BAD} {line}")
-        elif line.startswith("⚠"):
-            # Passing (non-fatal) but explicitly a warning. The message text already
-            # opens with its own ⚠ glyph, so DON'T prepend a contradictory ✓ — that
-            # produced a confusing "✓ ⚠ ..." double glyph (fresh-install audit finding).
-            # Indent two spaces to keep column alignment with the ✓/✗ lines.
-            _emit(f"  {line}")
+            sev = "critical"
+            critical = True
+        elif msg.startswith("⚠"):
+            sev = "warning"
         else:
-            _emit(f"  {_OK} {line}")
+            sev = "ok"
+        checks.append({"ok": ok, "severity": sev, "message": msg, "id": f"check_{i}"})
+    return {
+        "schema": "council.doctor/v1",
+        "ok": not critical,
+        "rc": 1 if critical else 0,
+        "critical": critical,
+        "advisory": bool(clis_flags.get("advisory")),
+        "checks": checks,
+    }
 
-    if critical_fail:
+
+def cmd_doctor(args: argparse.Namespace) -> int:
+    cfg = load_config()
+    report = _doctor_collect(cfg)
+    if getattr(args, "json", False):
+        import json as _json
+        _emit(_json.dumps(report, ensure_ascii=False, default=str))
+        return report["rc"]
+
+    cat = load_catalog(cfg)
+    _emit(t(cat, "cli.doctor.header"))
+    for c in report["checks"]:
+        sev, msg = c["severity"], c["message"]
+        if sev == "critical":
+            _emit(f"  {_BAD} {msg}")
+        elif sev == "warning":
+            # Message already opens with its own ⚠ glyph — don't prepend a ✓ (double-glyph
+            # fresh-install audit finding). Indent to keep ✓/✗ column alignment.
+            _emit(f"  {msg}")
+        else:
+            _emit(f"  {_OK} {msg}")
+
+    if report["critical"]:
         _emit(t(cat, "cli.doctor.critical_failed", bad=_BAD))
-        return 1
-    # Advisory footer (Faz 1): a fresh machine with 0 runnable providers PASSES (rc 0),
-    # but must not read as a fully-ready "All checks passed." The no_providers line opens
-    # with "⚠ 0 " (cli.doctor.no_providers) — key off that. rc is unchanged either way.
-    advisory = bool(clis_flags.get("advisory"))   # structured, not locale-dependent text
-    _emit(t(cat, "cli.doctor.all_passed_advisory" if advisory else "cli.doctor.all_passed", ok=_OK))
-    return 0
+        rc = 1
+    else:
+        # Advisory footer (Faz 1): 0 runnable providers PASSES (rc 0) but isn't "fully
+        # ready" — keyed off the structured advisory flag, not locale-dependent text.
+        _emit(t(cat, "cli.doctor.all_passed_advisory" if report["advisory"] else "cli.doctor.all_passed", ok=_OK))
+        rc = 0
+
+    # Opt-in AI repair (Faz 2). Runs AFTER the report so the operator sees it; no-ops on a
+    # clean install; default OFF (needs KONSEY_REPAIR=1 or --force). See council/repair.py.
+    if getattr(args, "fix", False):
+        return repair.run_repair_loop(cfg, args)
+    return rc
 
 
 # ---------------------------------------------------------------------------
@@ -1138,7 +1172,11 @@ def build_parser() -> argparse.ArgumentParser:
     sp.set_defaults(func=cmd_init)
 
     sp = sub.add_parser("doctor", help="evidence-based health check")
-    sp.add_argument("--fix", action="store_true", help="apply only safe automatic fixes")
+    sp.add_argument("--json", action="store_true", help="machine-readable findings (JSON on stdout)")
+    sp.add_argument("--fix", action="store_true",
+                    help="opt-in: let a sandboxed AI provider repair a broken install (default OFF; needs KONSEY_REPAIR=1 or --force)")
+    sp.add_argument("--force", action="store_true",
+                    help="with --fix: skip the confirm + dirty-git guard (scripted/CI repair)")
     sp.set_defaults(func=cmd_doctor)
 
     sp = sub.add_parser("run", help="headless 9-state loop")
