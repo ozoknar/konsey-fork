@@ -117,11 +117,17 @@ def _detect_os() -> str:
 def _detect_locale() -> str | None:
     """Best-effort OS locale → a supported catalog locale (Article 17).
 
-    Honours true POSIX precedence: the FIRST *set* variable in LC_ALL > LC_MESSAGES >
-    LANG decides (a higher-priority non-Turkish value wins over a lower-priority
-    ``tr``). A ``tr*`` value (e.g. ``tr_TR.UTF-8``) selects Turkish, any other set value
-    selects English. Returns ``None`` when NO locale variable is set, so the caller can
-    fall back to the stored profile / default. No network, no side effects."""
+    A ``KONSEY_LOCALE`` env var (set by the installer / scriptable piped runs) takes
+    precedence over the OS locale. Otherwise honours true POSIX precedence: the FIRST
+    *set* variable in LC_ALL > LC_MESSAGES > LANG decides (a higher-priority non-Turkish
+    value wins over a lower-priority ``tr``). A ``tr*`` value (e.g. ``tr_TR.UTF-8``)
+    selects Turkish, any other set value selects English. Returns ``None`` when NOTHING
+    is set, so the caller can fall back to the stored profile / default. No side effects."""
+    forced = os.environ.get("KONSEY_LOCALE", "").strip().lower()
+    if forced[:2] == "tr":
+        return "tr"
+    if forced:
+        return "en"
     for var in ("LC_ALL", "LC_MESSAGES", "LANG"):
         val = os.environ.get(var, "")
         if val:                                # first set variable wins (POSIX)
@@ -256,6 +262,20 @@ def cmd_init(args: argparse.Namespace) -> int:
     if initial_locale not in _LOCALES:
         initial_locale = "en"
     cat = load_catalog(replace(cfg, locale=initial_locale))
+
+    # Decide whether to proceed AT ALL before claiming anything about defaults.
+    if target.exists() and not args.reconfigure and not args.quick:
+        _emit(t(cat, "cli.init.profile_exists", target=target))
+        if not _confirm(t(cat, "cli.init.reconfigure_q"), default=False):
+            _emit(t(cat, "cli.init.left_untouched"))
+            return 0
+
+    # Non-TTY honesty (Faz 1): now that we ARE proceeding, a piped run must not silently
+    # feed _ask() its defaults and pretend the user answered — switch + SAY SO (stderr).
+    if not quick and not _is_tty():
+        _err(t(cat, "cli.init.noninteractive_notice"))
+        quick = True
+
     if quick:
         locale = initial_locale
     else:
@@ -263,12 +283,6 @@ def cmd_init(args: argparse.Namespace) -> int:
         if locale not in _LOCALES:
             locale = initial_locale
         cat = load_catalog(replace(cfg, locale=locale))   # re-bind: rest of init in chosen language
-
-    if target.exists() and not args.reconfigure and not args.quick:
-        _emit(t(cat, "cli.init.profile_exists", target=target))
-        if not _confirm(t(cat, "cli.init.reconfigure_q"), default=False):
-            _emit(t(cat, "cli.init.left_untouched"))
-            return 0
 
     _emit(t(cat, "cli.init.bootstrap"))
     _emit(t(cat, "cli.init.council_home", value=cfg.council_home))
@@ -355,7 +369,7 @@ def cmd_init(args: argparse.Namespace) -> int:
 # ---------------------------------------------------------------------------
 
 
-def _doctor_clis(cfg: Config, results: list[tuple[bool, str]]) -> None:
+def _doctor_clis(cfg: Config, results: list[tuple[bool, str]], flags: dict | None = None) -> None:
     cat = load_catalog(cfg)
     if not cfg.agents:
         results.append((False, t(cat, "cli.doctor.roster_none")))
@@ -389,6 +403,8 @@ def _doctor_clis(cfg: Config, results: list[tuple[bool, str]]) -> None:
         # Non-fatal (a fresh machine legitimately has no CLI yet) but UNMISTAKABLY a warning,
         # so "Install complete" is never read as "fully working" (fresh-install audit finding).
         results.append((True, t(cat, "cli.doctor.no_providers")))
+        if flags is not None:
+            flags["advisory"] = True   # 0 providers → footer says "advisory mode" (locale-independent)
     elif enabled_ok < 2:
         results.append((True, t(cat, "cli.doctor.one_provider",
                                  n=enabled_ok, cap=cfg.confidence_cap_noxval)))
@@ -550,7 +566,8 @@ def cmd_doctor(args: argparse.Namespace) -> int:
     results.append((True, t(cat, "cli.doctor.config_line", path=cfg.config_path(), state=state)))
     results.append((True, t(cat, "cli.doctor.owner_line", owner=repr(cfg.owner), locale=cfg.locale, regime=cfg.data_regime)))
 
-    _doctor_clis(cfg, results)
+    clis_flags: dict = {}
+    _doctor_clis(cfg, results, clis_flags)
     _doctor_duckdb(cfg, results)
     _doctor_append_only(cfg, results)
     _doctor_gateway(cfg, results)
@@ -576,7 +593,11 @@ def cmd_doctor(args: argparse.Namespace) -> int:
     if critical_fail:
         _emit(t(cat, "cli.doctor.critical_failed", bad=_BAD))
         return 1
-    _emit(t(cat, "cli.doctor.all_passed", ok=_OK))
+    # Advisory footer (Faz 1): a fresh machine with 0 runnable providers PASSES (rc 0),
+    # but must not read as a fully-ready "All checks passed." The no_providers line opens
+    # with "⚠ 0 " (cli.doctor.no_providers) — key off that. rc is unchanged either way.
+    advisory = bool(clis_flags.get("advisory"))   # structured, not locale-dependent text
+    _emit(t(cat, "cli.doctor.all_passed_advisory" if advisory else "cli.doctor.all_passed", ok=_OK))
     return 0
 
 

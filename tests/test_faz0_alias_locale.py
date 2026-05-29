@@ -15,7 +15,7 @@ import tomllib
 from pathlib import Path
 
 from council import i18n
-from council.cli import _detect_locale, _prog_name, build_parser, cmd_init
+from council.cli import _detect_locale, _prog_name, build_parser, cmd_doctor, cmd_init
 
 REPO = Path(__file__).resolve().parent.parent
 
@@ -50,7 +50,7 @@ def test_prog_name_reflects_invoked_command(monkeypatch):
 # --------------------------------------------------------------------------- #
 
 def _clear_locale_env(monkeypatch):
-    for v in ("LC_ALL", "LC_MESSAGES", "LANG"):
+    for v in ("LC_ALL", "LC_MESSAGES", "LANG", "KONSEY_LOCALE"):
         monkeypatch.delenv(v, raising=False)
 
 
@@ -133,3 +133,49 @@ def test_init_quick_defaults_english_without_signal(tmp_path, monkeypatch, capsy
     rc, out, toml = _init(tmp_path, monkeypatch, capsys)   # no flag, no LANG
     assert rc == 0
     assert 'locale = "en"' in toml
+
+
+# --------------------------------------------------------------------------- #
+# Faz 1 — KONSEY_LOCALE override · non-TTY honesty · doctor advisory footer     #
+# --------------------------------------------------------------------------- #
+
+def test_detect_locale_konsey_env_override(monkeypatch):
+    _clear_locale_env(monkeypatch)
+    monkeypatch.setenv("LANG", "en_US.UTF-8")
+    monkeypatch.setenv("KONSEY_LOCALE", "tr")
+    assert _detect_locale() == "tr"          # KONSEY_LOCALE beats the OS locale
+    monkeypatch.setenv("KONSEY_LOCALE", "en")
+    monkeypatch.setenv("LANG", "tr_TR.UTF-8")
+    assert _detect_locale() == "en"
+    monkeypatch.setenv("KONSEY_LOCALE", "")  # empty → falls through to OS locale
+    assert _detect_locale() == "tr"          # LANG=tr_TR wins again
+
+
+def test_init_non_tty_announces_defaults_not_silent(tmp_path, monkeypatch, capsys):
+    monkeypatch.setenv("COUNCIL_HOME", str(tmp_path))
+    monkeypatch.setenv("COUNCIL_DATA_HOME", str(tmp_path / "data"))
+    monkeypatch.delenv("COUNCIL_CONFIG", raising=False)
+    _clear_locale_env(monkeypatch)
+    monkeypatch.setattr("council.cli._is_tty", lambda: False)
+    # quick=False, but a non-TTY (piped) run must auto-default AND say so — not silently.
+    rc = cmd_init(argparse.Namespace(quick=False, reconfigure=False, locale="en"))
+    cap = capsys.readouterr()
+    assert rc == 0
+    assert "non-interactive stdin" in cap.err            # the honest notice (stderr)
+    assert (tmp_path / "council.local.toml").exists()     # still completed
+
+
+def test_doctor_advisory_footer_when_zero_providers(tmp_path, monkeypatch, capsys):
+    profile = tmp_path / "council.local.toml"
+    profile.write_text(
+        f'owner = "t"\ncouncil_home = "{tmp_path}"\n'
+        '[[agents]]\nname = "claude"\ncli = "claude"\nrole = "lead"\nenabled = false\n',
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("COUNCIL_CONFIG", str(profile))
+    monkeypatch.setenv("COUNCIL_DATA_HOME", str(tmp_path / "data"))
+    _clear_locale_env(monkeypatch)
+    rc = cmd_doctor(argparse.Namespace(fix=False))
+    out = capsys.readouterr().out
+    assert rc == 0                       # advisory is a PASS, not a failure
+    assert "advisory mode" in out        # ...but the footer says so, not "All checks passed."
