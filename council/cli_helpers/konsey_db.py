@@ -27,6 +27,8 @@ import duckdb
 
 from council.config import Config, load_config
 
+from ..i18n import load_catalog, t
+
 _SCHEMA = Path(__file__).resolve().parent.parent / "db" / "schema.sql"
 
 
@@ -85,7 +87,8 @@ def end(a: argparse.Namespace) -> None:
             " VALUES (?,?,?,?,?)",
             [a.session, "orchestrator", "session_end", payload, _hash(payload)],
         )
-    print(f"session_end logged: {a.session} status={a.status}")
+    cat = load_catalog(_cfg(a))
+    print(t(cat, "konsey_db.session_end_logged", session=a.session, status=a.status))
 
 
 def message(a: argparse.Namespace) -> None:
@@ -156,7 +159,8 @@ def query(a: argparse.Namespace) -> None:
     low = a.sql.strip().lower()
     if not (low.startswith("select") or low.startswith("with") or low.startswith("describe")
             or low.startswith("summarize") or low.startswith("pragma")):
-        sys.exit("REJECTED: append-only — only SELECT/WITH/DESCRIBE/SUMMARIZE/PRAGMA queries are allowed.")
+        cat = load_catalog(_cfg(a))
+        sys.exit(t(cat, "konsey_db.query_rejected"))
     with _conn(a) as c:
         for row in c.execute(a.sql).fetchall():
             print(row)

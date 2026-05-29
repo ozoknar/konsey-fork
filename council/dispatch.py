@@ -25,6 +25,7 @@ from datetime import datetime
 from pathlib import Path
 
 from .config import Config, load_config
+from .i18n import load_catalog, t
 from .platform import get_notifier
 
 # Autonomy ceiling (Article 14 / 5.3). FIXED — no config may widen it. Anything above
@@ -89,10 +90,11 @@ def _preflight(task: str, hint: str, cfg: Config | None = None):
         except TypeError:
             return preflight(task, hint)   # tolerate an older signature without cfg
     except Exception:
+        cat = load_catalog(cfg)
         class _Shim:
             risk = "production"        # fail-safe: unknown classification → above the ceiling
             blocked = True
-            block_reason = "gateway unavailable (Phase-2 stub) — refusing autonomous run"
+            block_reason = t(cat, "dispatch.gateway_unavailable")
             notes: list[str] = []
         return _Shim()
 
@@ -158,6 +160,7 @@ def _run_graph(task: str, hint: str, cfg: Config):
 
 def _run_task(cfg: Config, bridge: _Bridge, task: str, hint: str, origin: str) -> Path:
     """Apply the gate ceiling; run the graph only when the AutoGate allows it, else queue-human."""
+    cat = load_catalog(cfg)
     gw = _preflight(task, hint, cfg)
     gate = _decide_gate(gw)
     base = f"{_ts()}-{_slug(task)}"
@@ -168,22 +171,25 @@ def _run_task(cfg: Config, bridge: _Bridge, task: str, hint: str, origin: str) -
         notes = getattr(gw, "notes", [])
         out = bridge.queue_human / f"{base}.md"
         out.write_text(
-            "# HUMAN APPROVAL REQUIRED — not run autonomously\n\n"
-            f"- task: {task}\n- source: {origin}\n- risk: {getattr(gw, 'risk', '?')}\n"
-            f"- reason: {reason}\n- notes: {notes}\n\n"
-            "Review and, if appropriate, run interactively with `council run`.\n",
+            t(cat, "dispatch.queue_human_report", task=task, origin=origin,
+              risk=getattr(gw, "risk", "?"), reason=reason, notes=notes),
             encoding="utf-8")
-        _notify(cfg, "Queued (human approval)", f"{getattr(gw, 'risk', '?')}: {task[:50]}")
+        _notify(cfg, t(cat, "dispatch.notify_queued_title"),
+                t(cat, "dispatch.notify_queued_body",
+                  risk=getattr(gw, "risk", "?"), task=task[:50]))
         return out
 
     # autonomous run (<= internal)
     final = _run_graph(task, hint, cfg)
     out = bridge.outbox / f"{base}.md"
-    out.write_text((final.get("report") or "(no report)") + f"\n\n---\nsource: {origin}\n",
+    out.write_text((final.get("report") or t(cat, "dispatch.no_report"))
+                   + "\n\n---\n" + t(cat, "dispatch.outbox_footer", origin=origin) + "\n",
                    encoding="utf-8")
     dec = final.get("decision", {}) or {}
-    _notify(cfg, "Completed",
-            f"conf={dec.get('confidence')} approval={'YES' if dec.get('human_required') else 'no'}")
+    _notify(cfg, t(cat, "dispatch.notify_completed_title"),
+            t(cat, "dispatch.notify_completed_body",
+              confidence=dec.get("confidence"),
+              approval="YES" if dec.get("human_required") else "no"))
     return out
 
 
@@ -253,9 +259,10 @@ def tick(cfg: Config | None = None) -> None:
     """Single periodic pass: inbox → scheduled → autocapture distil + DB snapshot + recall cache.
     Single-instance via flock (POSIX); on platforms without ``fcntl`` it degrades to no lock."""
     cfg = cfg or load_config()
+    cat = load_catalog(cfg)
     bridge = _Bridge(cfg)
     if not bridge.active:
-        print(f"[{datetime.now():%Y-%m-%d %H:%M}] tick inert (no bridge_dir configured)")
+        print(t(cat, "dispatch.tick_inert", ts=f"{datetime.now():%Y-%m-%d %H:%M}"))
         return
     bridge.ensure()
 
@@ -266,7 +273,7 @@ def tick(cfg: Config | None = None) -> None:
         try:
             fcntl.flock(lockf, fcntl.LOCK_EX | fcntl.LOCK_NB)
         except BlockingIOError:
-            print(f"[{datetime.now():%Y-%m-%d %H:%M}] tick skipped (another tick running)")
+            print(t(cat, "dispatch.tick_skipped", ts=f"{datetime.now():%Y-%m-%d %H:%M}"))
             lockf.close()
             return
     except ImportError:
@@ -284,7 +291,8 @@ def tick(cfg: Config | None = None) -> None:
             write_recall_cache(cfg)
         except Exception as e:
             c = f"err:{e}"
-        print(f"[{datetime.now():%Y-%m-%d %H:%M}] inbox={a} scheduled={b} capture={c}")
+        print(t(cat, "dispatch.tick_summary", ts=f"{datetime.now():%Y-%m-%d %H:%M}",
+                inbox=a, scheduled=b, capture=c))
     finally:
         if lockf is not None:
             try:
@@ -299,10 +307,11 @@ def main(argv: list[str] | None = None) -> None:
     argv = sys.argv[1:] if argv is None else argv
     cmd = argv[0] if argv else "tick"
     cfg = load_config()
+    cat = load_catalog(cfg)
     {
         "tick": lambda: tick(cfg),
-        "inbox": lambda: print("inbox:", process_inbox(cfg)),
-        "scheduled": lambda: print("scheduled:", run_scheduled(cfg)),
+        "inbox": lambda: print(t(cat, "dispatch.main_inbox"), process_inbox(cfg)),
+        "scheduled": lambda: print(t(cat, "dispatch.main_scheduled"), run_scheduled(cfg)),
     }.get(cmd, lambda: tick(cfg))()
 
 
