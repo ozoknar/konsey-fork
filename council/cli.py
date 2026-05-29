@@ -1076,7 +1076,10 @@ def main(argv: list[str] | None = None) -> int:
     try:
         return int(args.func(args) or 0)
     except KeyboardInterrupt:
-        _err("\ninterrupted")
+        try:
+            _err(t(load_catalog(load_config()), "cli.interrupted"))
+        except Exception:
+            _err("\ninterrupted")
         return 130
 
 

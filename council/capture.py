@@ -633,12 +633,13 @@ def main(argv: list[str] | None = None) -> None:
     argv = sys.argv[1:] if argv is None else argv
     cmd = argv[0] if argv else "process"
     cfg = load_config()
+    cat = load_catalog(cfg)
     {
         "hook": lambda: hook(cfg),
         "recall": lambda: recall(cfg),
-        "process": lambda: print(f"capture processed={process_capture(cfg)}"),
-        "backup": lambda: print(f"backup={backup_db(cfg)}"),
-        "recall-cache": lambda: (write_recall_cache(cfg), print("recall-cache written")),
+        "process": lambda: print(t(cat, "capture.cli.processed", count=process_capture(cfg))),
+        "backup": lambda: print(t(cat, "capture.cli.backup", path=backup_db(cfg))),
+        "recall-cache": lambda: (write_recall_cache(cfg), print(t(cat, "capture.cli.recall_cache_written"))),
     }.get(cmd, lambda: None)()
 
 
