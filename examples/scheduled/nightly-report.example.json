@@ -1,0 +1,9 @@
+{
+  "_comment": "Example scheduled job (disabled). Opt-in only; default OFF.",
+  "name": "nightly-report",
+  "enabled": false,
+  "cron": "0 3 * * *",
+  "task": "Summarize today's council sessions",
+  "project": "docs/*",
+  "max_risk_auto": "internal"
+}

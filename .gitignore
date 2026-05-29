@@ -1,0 +1,77 @@
+# ──────────────────────────────────────────────────────────────────────────
+# ALLOW-LIST .gitignore (critique CRITICAL: a block-list always misses something
+# in this kind of repo — keychain comments, agent-card org, second PHI copy).
+# Strategy: ignore EVERYTHING first, then re-allow only the portable surface.
+# ──────────────────────────────────────────────────────────────────────────
+
+# 1) Ignore everything.
+*
+
+# 2) Re-allow the portable directories (and let their contents be matched below).
+!/council/
+!/constitution/
+!/docs/
+!/examples/
+!/tests/
+!/.github/
+!*/
+
+# 3) Re-allow only safe, portable file types.
+!*.md
+!*.py
+!*.toml
+!*.txt
+!*.sh
+!*.ps1
+!*.json
+!*.sql
+!*.yml
+!*.yaml
+!*.cff
+!*.svg
+!*.png
+!*.editorconfig
+!*.gitattributes
+!.gitignore
+!LICENSE
+!NOTICE
+
+# 4) NEVER commit these machine-specific leaks, even if a rule above re-allowed them.
+council.local.*
+COUNCIL.md
+COUNCIL.local.md
+KONSEY_ANAYASASI.md
+KONSEY_ANAYASASI_*archived*
+KONSEY_ANAYASASI_GENEL*.md
+a2a_peers.json
+council/a2a/agent-card.json
+bin/konsey-keychain.sh
+
+# 5) Runtime / data / secrets — never tracked.
+*.duckdb
+*.duckdb.wal
+backups/
+logs/
+sessions/
+recall-cache.json
+**/.captured.log
+**/.processing
+dashboard.html
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# 6) Build / venv / caches.
+.venv/
+venv/
+__pycache__/
+*.pyc
+*.pyo
+dist/
+build/
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/

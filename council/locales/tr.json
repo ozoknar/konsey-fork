@@ -1,0 +1,4 @@
+{
+  "_meta": "Türkçe katalog. Faz 2 durum prompt'larını ve CLI metinlerini doldurur.",
+  "advisory_mode": "Danışman modu: 2'den az bağımsız sağlayıcı; çapraz-doğrulama kapalı, güven tavanı 0.6, çıktı doğrulanmamış damgalı."
+}

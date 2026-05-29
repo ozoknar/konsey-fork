@@ -1,0 +1,5 @@
+# Pinned mirror of pyproject.toml runtime deps (versions from the proven .venv).
+langgraph==1.2.2
+langchain-core==1.4.0
+duckdb==1.5.3
+pydantic==2.13.4

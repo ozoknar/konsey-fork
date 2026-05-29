@@ -1,0 +1,12 @@
+# Example regulatory-regime plugin (FICTIONAL terms only). Activated when
+# data_regime = "hipaa" (or kvkk/gdpr). Clinical/identity term lists live ONLY in
+# these plugin files — never in core, audit, or capture code (no second source).
+# A detection aid, NOT a compliance guarantee (Article 4.3); liability is the operator's.
+regime = "hipaa"
+
+# Generic illustrative markers — replace with your jurisdiction's real list.
+terms = ["example_clinical_term_a", "example_clinical_term_b"]
+
+[[identifiers]]
+name = "example_national_id"
+pattern = "\\b[0-9]{9}\\b"

@@ -1,0 +1,4 @@
+{
+  "_comment": "Example A2A peer registry (empty/disabled by default → inert).",
+  "peers": []
+}

@@ -1,0 +1,59 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "konsey-cli"
+version = "0.1.0"
+description = "Multi-agent, evidence-weighted, vendor-independent work doctrine and terminal orchestrator."
+readme = "README.md"
+requires-python = ">=3.12"
+license = "Apache-2.0"
+license-files = ["LICENSE", "NOTICE"]
+keywords = ["llm", "orchestration", "multi-agent", "audit", "evidence-weighted", "cli"]
+authors = [{ name = "Council contributors" }]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: Apache Software License",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Software Development :: Quality Assurance",
+]
+dependencies = [
+    "langgraph==1.2.2",
+    "langchain-core==1.4.0",
+    "duckdb==1.5.3",
+    "pydantic==2.13.4",
+]
+
+[project.optional-dependencies]
+dev = [
+    "ruff",
+    "pytest",
+    "mypy",
+    "build",
+]
+
+[project.scripts]
+council = "council.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/OWNER/council"
+Repository = "https://github.com/OWNER/council"
+
+[tool.hatch.build.targets.wheel]
+packages = ["council"]
+
+[tool.hatch.build.targets.wheel.force-include]
+"council/locales/en.json" = "council/locales/en.json"
+"council/locales/tr.json" = "council/locales/tr.json"
+"council/db/schema.sql" = "council/db/schema.sql"
+
+[tool.ruff]
+target-version = "py312"
+line-length = 110
+
+[tool.mypy]
+python_version = "3.12"
+ignore_missing_imports = true

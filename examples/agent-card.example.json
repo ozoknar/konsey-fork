@@ -1,0 +1,9 @@
+{
+  "_comment": "Example A2A agent card. All concrete values are ${templated} demo placeholders — fictional org/node, never a real one.",
+  "name": "${NODE_NAME}",
+  "org": "${ORG}",
+  "owner": "operator",
+  "endpoint": "http://127.0.0.1:0",
+  "roles": ["lead", "critic", "verifier"],
+  "enabled": false
+}

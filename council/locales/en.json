@@ -1,0 +1,4 @@
+{
+  "_meta": "Default English catalog. Phase-2 fills state prompts and CLI strings.",
+  "advisory_mode": "Advisory mode: fewer than 2 independent providers; cross-verification disabled, confidence capped at 0.6, output marked unverified."
+}
