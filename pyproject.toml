@@ -39,8 +39,8 @@ dev = [
 council = "council.cli:main"
 
 [project.urls]
-Homepage = "https://github.com/OWNER/council"
-Repository = "https://github.com/OWNER/council"
+Homepage = "https://github.com/OWNER/konsey"
+Repository = "https://github.com/OWNER/konsey"
 
 [tool.hatch.build.targets.wheel]
 packages = ["council"]

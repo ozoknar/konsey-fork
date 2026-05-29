@@ -1,7 +1,7 @@
 # Known Limitations / Bilinen Sınırlar (Phase 2 backlog)
 
 > Honest scope statement (Constitution Art. 2.1 — no unverified "it works" claims).
-> The MVP core is functional and tested (91/91); the items below are deliberately
+> The MVP core is functional and tested (92/92, incl. a fresh Linux Docker install); the items below are deliberately
 > deferred to Phase 2 and must NOT be presented as already-complete.
 
 ## EN
@@ -21,8 +21,11 @@
   classification (live `run` path applies them).
 - **i18n catalog coverage.** `locales/en.json` is canonical; `tr.json` and full prompt
   externalization are partial — some strings remain English-default.
-- **Linux/Windows OS layers** (`platform/scheduler`, `secrets`) are abstracted but only the
-  macOS path is battle-tested; systemd/schtasks are stubs to validate.
+- **Linux/Windows OS layers** (`platform/scheduler`, `secrets`): the **cron scheduler + Null\*
+  fallbacks are now validated on Linux** (Docker `python:3.12-slim` fresh-install audit:
+  install → init → doctor → run + cron install/uninstall round-trip + pytest 92/92, all green;
+  macOS backends called on Linux returned None/False without raising). Still unvalidated with a
+  live daemon: **systemd-timer / Windows Task Scheduler**.
 - **Regime term-file presence (fail-open edge).** The secret scan is always on (verified:
   sk-ant / AKIA blocked under `standard`). But clinical/identity detection needs the regime
   *term file* (`regimes/*.toml`) installed — setting `data_regime=hipaa` WITHOUT the term file
@@ -59,4 +62,4 @@
 - **Risk-vocabulary mismatch (cross-provider catch):** `decide.py` and `capture.py`'s gate
   checked `"phi"` while `gateway.py` emits `"sensitive"` → sensitive decisions weren't escalated
   and sensitive sessions weren't gated. Both realigned to "sensitive" (+phi alias). Tests assert
-  the canonical class. pytest 91/91.
+  the canonical class. pytest 92/92 (incl. fresh Docker-Linux install audit).

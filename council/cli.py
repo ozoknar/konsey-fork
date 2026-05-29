@@ -337,11 +337,19 @@ def _doctor_clis(cfg: Config, results: list[tuple[bool, str]]) -> None:
             results.append((True, f"agent {a.name}: '{a.cli}' runnable ({path})"))
         else:
             results.append((False, f"agent {a.name}: '{a.cli}' found but did not run cleanly"))
-    if enabled_ok < 2:
+    if enabled_ok == 0:
+        # Non-fatal (a fresh machine legitimately has no CLI yet) but UNMISTAKABLY a warning,
+        # so "Install complete" is never read as "fully working" (fresh-install audit finding).
         results.append((
             True,
-            f"cross-verification: only {enabled_ok} provider(s) runnable -> advisory mode "
-            f"(confidence capped at {cfg.confidence_cap_noxval})",
+            "⚠ 0 providers runnable — council CANNOT run tasks yet; install at least one CLI "
+            "(e.g. claude / codex / gemini) and re-run `council doctor`. (advisory mode)",
+        ))
+    elif enabled_ok < 2:
+        results.append((
+            True,
+            f"⚠ advisory mode: only {enabled_ok} provider runnable — no cross-validation, "
+            f"confidence capped at {cfg.confidence_cap_noxval}; add a 2nd provider for full council.",
         ))
 
 
