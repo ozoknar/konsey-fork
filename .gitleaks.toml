@@ -20,4 +20,5 @@ paths = [
 regexes = [
   '''FAKE_[A-Z_]+''',
   '''sk-ant-api03-aBcDeFgHiJkLmNoPqRsTuV''',
+  '''KONSEY_REPAIR=1''',   # benign opt-in env-var token in repair.py docs — not a credential
 ]

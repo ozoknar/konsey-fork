@@ -7,8 +7,9 @@ invocation **builder**, the env **allow-list**, the safety **gate**, and the ver
 **loop** all live here as the reusable, unit-testable seam.
 
 Doctrine (non-negotiable):
-  * OPT-IN, default OFF — two keys: ``KONSEY_REPAIR=1`` env AND ``--fix`` (+ a TTY confirm
-    or ``--force``). A piped / CI run can NEVER auto-spawn a tool-ON agent.
+  * OPT-IN, default OFF — two independent switches: the ``KONSEY_REPAIR`` env var set to 1,
+    AND ``--fix`` (plus a TTY confirm, or ``--force``). A piped / CI run can NEVER
+    auto-spawn a tool-ON agent.
   * cwd-pinned to ``cfg.council_home``; a strict env ALLOW-LIST (never the full
     ``os.environ`` that the advisory adapter copies — a file-writing worker must not
     inherit every secret).
