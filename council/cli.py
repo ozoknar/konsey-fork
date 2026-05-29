@@ -153,6 +153,19 @@ def _detect_roster(extra_path: str) -> list[tuple[str, str, bool]]:
     return out
 
 
+def _scan_host_isolation() -> list | None:
+    """Host AI-config footprint that would leak into a node (Article 2.6).
+
+    Returns the findings list, ``[]`` when the host is genuinely clean, or **None when
+    the detector/scan was unavailable** — None is NOT "clean": scan-unavailable ≠
+    no-leak (the evidence standard, Article 2.1). Callers must distinguish the two."""
+    try:
+        from .isolation import scan_host_ai_config
+        return scan_host_ai_config(Path(os.path.expanduser("~")), Path.cwd())
+    except Exception:
+        return None
+
+
 def _toml_escape(value: str) -> str:
     return value.replace("\\", "\\\\").replace('"', '\\"')
 
@@ -289,6 +302,22 @@ def cmd_init(args: argparse.Namespace) -> int:
     _emit(t(cat, "cli.init.wrote"))
     for p in written:
         _emit(f"  {p}")
+
+    # Host AI-config scan (Article 2.6 — node isolation). Informational at install
+    # time: name the pre-existing host config that WOULD leak into a provider node, so
+    # the operator knows before the first run. Detection only — nothing is modified.
+    _emit(t(cat, "cli.init.isolation_header"))
+    host_findings = _scan_host_isolation()
+    if host_findings is None:
+        # scan-unavailable ≠ clean (Article 2.1): do NOT claim the host is clean.
+        _emit(t(cat, "cli.init.isolation_unavailable"))
+    elif host_findings:
+        for f in host_findings:
+            _emit(t(cat, "cli.init.isolation_item", mark=_WARN, label=f.label, node=f.pollutes, path=f.path))
+        _emit(t(cat, "cli.init.isolation_note"))
+    else:
+        _emit(t(cat, "cli.init.isolation_clean"))
+
     _emit(t(cat, "cli.init.next_steps"))
     return 0
 
@@ -461,6 +490,29 @@ def _doctor_regime(cfg: Config, results: list[tuple[bool, str]]) -> None:
         results.append((True, t(cat, "cli.doctor.regime_not_loaded", regime=regime, plugin=plugin)))
 
 
+def _doctor_host_isolation(cfg: Config, results: list[tuple[bool, str]]) -> None:
+    """Node execution isolation (Article 2.6): detect pre-existing host AI config that
+    WOULD leak into a provider subprocess and collapse the cross-provider independence
+    Article 2.2 requires. Detection only — a non-fatal ⚠ that names how many host files
+    would leak and into which node; isolation *enforcement* is the adapter layer
+    (KNOWN_ISSUES: node-isolation). Evidence, not assumption: the paths are really
+    stat()'d, not guessed."""
+    cat = load_catalog(cfg)
+    try:
+        from .isolation import scan_host_ai_config, summarize
+        # The scan probes untrusted host filesystem state — guard it too, not just the
+        # import, so a stat/permission edge case can never crash doctor.
+        findings = scan_host_ai_config(Path(os.path.expanduser("~")), Path.cwd())
+    except Exception:
+        return  # detector unavailable or scan failed → skip silently (never crash)
+    if not findings:
+        results.append((True, t(cat, "cli.doctor.isolation_clean")))
+        return
+    # Message text opens with its own ⚠ glyph → rendered as a non-fatal warning, not ✗.
+    results.append((True, t(cat, "cli.doctor.isolation_leak",
+                            n=len(findings), summary=summarize(findings))))
+
+
 def cmd_doctor(args: argparse.Namespace) -> int:
     cfg = load_config()
     cat = load_catalog(cfg)
@@ -476,6 +528,7 @@ def cmd_doctor(args: argparse.Namespace) -> int:
     _doctor_gateway(cfg, results)
     _doctor_graph(cfg, results)
     _doctor_regime(cfg, results)
+    _doctor_host_isolation(cfg, results)
 
     _emit(t(cat, "cli.doctor.header"))
     critical_fail = False

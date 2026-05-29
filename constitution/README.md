@@ -1,10 +1,14 @@
 # The Council Constitution
 
-The portable doctrine that the orchestrator enforces. Version **7.0.0** (portable
+The portable doctrine that the orchestrator enforces. Version **7.1.0** (portable
 core). Doctrine text is licensed **CC-BY-4.0** (the reference implementation code is
 Apache-2.0, separately — see the repository root `LICENSE`).
 
-The canonical text currently lives in **`KONSEY_ANAYASASI.md`** (Turkish, v7.0.0).
+> **Where the full text lives.** The shipped canonical doctrine is **this summary**
+> until the English `COUNCIL_CONSTITUTION.md` (+ `.tr.md` mirror) lands (Phase 2,
+> below). The full Turkish working draft is intentionally kept out of the repo: the
+> filename `KONSEY_ANAYASASI.md` is `.gitignore`d so that a machine-specific *live*
+> constitution of the same name can never leak into this OSS tree.
 
 ## What it is
 
@@ -20,6 +24,14 @@ profile — never embedded in the doctrine text.
 - **Article 2 — Core principles (immutable):** evidence over consensus; at least two
   independent providers; the producer of a claim is never its sole verifier;
   reversibility (no direct production writes).
+- **Article 2.6 — Node execution isolation (immutable, new in v7.1.0):** a node must
+  run its provider CLI *isolated* from the host machine's own AI config (`CLAUDE.md` /
+  `AGENTS.md` / `GEMINI.md`, settings/hooks, MCP); otherwise one machine's
+  instructions leak into every provider at once and collapse the cross-provider
+  independence Article 2.2 requires. Full environment inheritance is forbidden;
+  inheriting host config is an explicit, trust-lowering opt-in; `council doctor` must
+  prove non-leakage with evidence. *Status: detection shipped; enforcement in
+  progress — see `KNOWN_ISSUES.md` (node-isolation).*
 - **Article 3 — Roles & roster:** generic roles (Lead / Critic / Researcher /
   Verifier) assigned to providers at run time; with a single agent it runs in
   *advisory mode* (confidence capped, output marked "unverified").

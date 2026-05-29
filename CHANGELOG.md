@@ -12,6 +12,16 @@ unverified "it works" claims. Test evidence is cited where it backs an entry.
 
 ### Added
 
+- **Node execution isolation — detection (Constitution Article 2.6, new).** A node that
+  shells out to a provider CLI loads the *host machine's* AI config (`CLAUDE.md` /
+  `AGENTS.md` / `GEMINI.md`, settings/hooks, MCP) — which collapses the cross-provider
+  independence Article 2.2 requires and can break a run. New `council/isolation.py`
+  (`scan_host_ai_config`) detects that footprint; `council init` lists it at install
+  time and `council doctor` surfaces it as a **non-fatal ⚠** (with a `node:count`
+  summary). Constitution bumped v7.0.0 → **v7.1.0** (additive, tightening). **Scope:**
+  this is PR1 = *detection + doctrine*; isolation **enforcement** (clean argv/env/cwd in
+  the adapter layer) is deliberately deferred to PR2 and is tracked in KNOWN_ISSUES.md
+  (node-isolation) — it is NOT claimed complete here.
 - `council doctor` now emits a **warning when fewer than 2 runnable providers** are on
   PATH, so a single-provider (advisory-mode) install is surfaced rather than silently
   accepted.

@@ -7,6 +7,23 @@
 
 ## EN
 
+- **node-isolation — Art. 2.6 enforcement deferred to PR2 (detection shipped).** A node
+  subprocess (claude/codex/agy) currently inherits the full host environment
+  (`adapters.py:_env`) and the host's AI instruction files (`CLAUDE.md`/`AGENTS.md`/
+  `GEMINI.md`), settings/hooks and MCP — verified by behavioural probe (`claude -p`
+  leaked the host CLAUDE.md persona; `codex debug prompt-input` showed global+repo
+  `AGENTS.md` injected). This collapses the cross-provider independence Art. 2.2
+  requires. **Shipped (PR1):** detection — `council/isolation.py` + a non-fatal ⚠ in
+  `council doctor` + an install-time list in `council init`, plus the Art. 2.6 doctrine.
+  **Deferred (PR2):** *enforcement* — isolated argv + env allow-list + clean CWD per
+  provider (claude `--strict-mcp-config`/`--setting-sources`; codex isolated
+  `CODEX_HOME` + `-c project_doc_max_bytes=0` + `--ignore-user-config` + clean `-C`; agy
+  clean HOME, no native flag), default-on with an explicit `--unsafe-inherit-provider-config`
+  opt-in, and an audited isolation manifest; plus **repo-bound scope** for the project-config
+  parent-walk (the PR1 detector walks cwd to the filesystem root, which can over-detect
+  ancestor configs above the repo/`$HOME` — acceptable for a warning, to be tightened to the
+  git-repo boundary). Until PR2 lands: do not assume nodes are independent of the host
+  machine's AI config.
 - **Art. 6.2 EXECUTE sandbox not yet enforced.** `exec_sandbox` exists in `Config` but is
   not wired into an execution path, because this MVP's orchestrator only invokes **provider
   CLIs** (claude/codex/agy) — it does not run arbitrary shell extracted from model output.
