@@ -492,10 +492,17 @@ def cmd_doctor(args: argparse.Namespace) -> int:
     _emit("council doctor — evidence-based health check\n")
     critical_fail = False
     for ok, line in results:
-        mark = _OK if ok else _BAD
         if not ok:
             critical_fail = True
-        _emit(f"  {mark} {line}")
+            _emit(f"  {_BAD} {line}")
+        elif line.startswith("⚠"):
+            # Passing (non-fatal) but explicitly a warning. The message text already
+            # opens with its own ⚠ glyph, so DON'T prepend a contradictory ✓ — that
+            # produced a confusing "✓ ⚠ ..." double glyph (fresh-install audit finding).
+            # Indent two spaces to keep column alignment with the ✓/✗ lines.
+            _emit(f"  {line}")
+        else:
+            _emit(f"  {_OK} {line}")
 
     if critical_fail:
         _emit(f"\n{_BAD} Critical checks failed. See lines marked above.")

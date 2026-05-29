@@ -114,3 +114,23 @@ def test_doctor_confirms_regime_when_file_present(tmp_path, monkeypatch, capsys)
     rc, out = _doctor(profile, monkeypatch, capsys)
     assert "term plugin loaded" in out
     assert "NO term file loaded" not in out
+
+
+# --------------------------------------------------------------------------- #
+# Render glyph: a passing-but-warning line must NOT carry a contradictory       #
+# "✓ ⚠ ..." double glyph (integration / fresh-install audit finding).           #
+# --------------------------------------------------------------------------- #
+
+def test_doctor_warning_line_has_no_double_glyph(tmp_path, monkeypatch, capsys):
+    """A non-fatal ⚠ line is rendered with its own ⚠ marker, never prefixed by ✓."""
+    profile = _profile(tmp_path, "hipaa", with_terms=False)
+    rc, out = _doctor(profile, monkeypatch, capsys)
+    warn_lines = [ln for ln in out.splitlines() if "data_regime='hipaa'" in ln]
+    assert warn_lines, "expected a regime warning line"
+    for ln in warn_lines:
+        # The warning glyph is present...
+        assert "⚠" in ln
+        # ...but never as a "✓ ⚠" (or "✓  ⚠") double glyph.
+        assert "✓ ⚠" not in ln and "✓  ⚠" not in ln
+        # The visible marker for the line is ⚠ itself, not ✓.
+        assert ln.lstrip().startswith("⚠")
