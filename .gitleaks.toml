@@ -1,0 +1,23 @@
+# gitleaks config for konsey.
+#
+# This project is itself a secret-scanner: its test suite intentionally contains
+# FAKE credentials (e.g. `FAKE_JWT`, a sample `sk-ant-…`, an `api_key = "…"` line)
+# to prove the gateway's secret gate catches them. Those fixtures are not real
+# credentials — they must not fail CI. Example/template files ship placeholders only.
+#
+# We keep ALL default gitleaks rules; we only allowlist the fixture/example paths.
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Intentional fake secrets in tests + placeholder examples (not real credentials)."
+paths = [
+  '''tests/.*''',              # test fixtures exercise the secret gate with fake samples
+  '''.*\.example\..*''',       # examples/*.example.* carry placeholders, never real values
+  '''KNOWN_ISSUES\.md''',      # documents the sk-ant sample the gate catches (no real value)
+]
+# Belt-and-suspenders: redact-safe stopwords for the obviously-fake markers we use.
+regexes = [
+  '''FAKE_[A-Z_]+''',
+  '''sk-ant-api03-aBcDeFgHiJkLmNoPqRsTuV''',
+]
