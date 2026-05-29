@@ -94,7 +94,10 @@ def test_changelog_is_portable_and_keepachangelog() -> None:
     assert "[0.1.0]" in body and "[Unreleased]" in body
     # Portable link target — same placeholder as pyproject, no real owner handle.
     assert "github.com/OWNER/konsey" in body
-    assert "drhakankilic" not in body
+    # No real owner identity must leak — assert the *shape* (no email address), never the
+    # actual handle (embedding it here would itself be the leak we're guarding against).
+    import re as _re
+    assert not _re.search(r"[\w.+-]+@[\w-]+\.\w+", body), "CHANGELOG must not contain an email/owner identity"
     # The MVP entry must cite its evidence honestly.
     assert "92/92" in body
 
