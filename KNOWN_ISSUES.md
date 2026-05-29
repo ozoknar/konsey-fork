@@ -20,8 +20,12 @@
 - **`run --dry-run` config application.** Dry-run preflight uses gateway defaults; the
   project risk-registry / data-regime from `council.local` are not yet applied to dry-run
   classification (live `run` path applies them).
-- **i18n catalog coverage.** `locales/en.json` is canonical; `tr.json` and full prompt
-  externalization are partial — some strings remain English-default.
+- **i18n — only prompts externalized so far.** The LLM-facing **prompts** are in `locales/{en,tr}.json`
+  (en canonical, tr full mirror, per-key fallback). But **non-prompt UI/diagnostic/report strings**
+  (doctor lines, report headers, decision rationale, gateway notes in `graph.py`/`cli.py`/`gateway.py`)
+  are still hardcoded **English** — acceptable as the default locale, but full Art. 17 ("no embedded
+  prose in core") is not yet met. Note: machine-readable contract tokens (`VERDICT: PASS/FAIL`,
+  `DISSENT:`) are intentionally kept English-literal (graph verdict parsing depends on them).
 - **Live-daemon scheduler validation (systemd / Windows).** The `cron` scheduler + `Null*`
   fallbacks are validated on Linux (see Resolved). Still **unvalidated against a running
   daemon: systemd user timers and Windows Task Scheduler.** Both backends exist
