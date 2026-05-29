@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import textwrap
 
-import pytest
 
 from council.config import (
     CONFIDENCE_CAP_NOXVAL,

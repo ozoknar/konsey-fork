@@ -334,11 +334,8 @@ def _classify_risk(text: str, cfg: Config) -> str:
     gateway is unavailable, so capture can be compiled/tested before gateway lands.
     ``cfg`` is forwarded so the gateway can honour the project risk registry / data regime."""
     try:
-        from .gateway import classify_risk  # type: ignore[attr-defined]
-        try:
-            return classify_risk(text, "", cfg)
-        except TypeError:
-            return classify_risk(text)   # tolerate an older single-arg signature
+        from .gateway import classify_risk
+        return classify_risk(text, "", cfg)
     except Exception:
         return "internal"
 
@@ -634,13 +631,17 @@ def main(argv: list[str] | None = None) -> None:
     cmd = argv[0] if argv else "process"
     cfg = load_config()
     cat = load_catalog(cfg)
-    {
-        "hook": lambda: hook(cfg),
-        "recall": lambda: recall(cfg),
-        "process": lambda: print(t(cat, "capture.cli.processed", count=process_capture(cfg))),
-        "backup": lambda: print(t(cat, "capture.cli.backup", path=backup_db(cfg))),
-        "recall-cache": lambda: (write_recall_cache(cfg), print(t(cat, "capture.cli.recall_cache_written"))),
-    }.get(cmd, lambda: None)()
+    if cmd == "hook":
+        hook(cfg)
+    elif cmd == "recall":
+        recall(cfg)
+    elif cmd == "process":
+        print(t(cat, "capture.cli.processed", count=process_capture(cfg)))
+    elif cmd == "backup":
+        print(t(cat, "capture.cli.backup", path=backup_db(cfg)))
+    elif cmd == "recall-cache":
+        write_recall_cache(cfg)
+        print(t(cat, "capture.cli.recall_cache_written"))
 
 
 if __name__ == "__main__":

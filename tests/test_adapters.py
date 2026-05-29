@@ -14,7 +14,6 @@ from __future__ import annotations
 import inspect
 import os
 
-import pytest
 
 from council.adapters import (
     GenericCLIAdapter,

@@ -15,7 +15,6 @@ from __future__ import annotations
 import argparse
 import textwrap
 
-import pytest
 
 from council.config import Config
 from council.cli import cmd_doctor

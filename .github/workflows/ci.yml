@@ -1,7 +1,7 @@
 name: ci
 on:
   push:
-    branches: [main]
+    branches: [main, master]   # repo default is master; also fire if renamed to main
   pull_request:
 jobs:
   test:

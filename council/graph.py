@@ -299,10 +299,9 @@ def decide_node(s: S, cfg: Config) -> dict:
     sid = s["session_id"]
     cat = load_catalog(cfg)
     if _dead(s):
-        dec = {"confidence": 0.0, "human_required": True,
-               "rationale": s.get("kill_reason") or s.get("block_reason") or t(cat, "graph.aborted")}
-        audit.decision(sid, "ABORTED: " + dec["rationale"], 0.0, [], [], False, cfg=cfg)
-        return {"decision": dec}
+        dead_rationale = s.get("kill_reason") or s.get("block_reason") or t(cat, "graph.aborted")
+        audit.decision(sid, "ABORTED: " + dead_rationale, 0.0, [], [], False, cfg=cfg)
+        return {"decision": {"confidence": 0.0, "human_required": True, "rationale": dead_rationale}}
     n_cross = 1 if s.get("verify_ok") else 0
     dec = decide(
         risk=s.get("risk", "internal"),

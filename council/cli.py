@@ -300,7 +300,6 @@ def cmd_init(args: argparse.Namespace) -> int:
 
 def _doctor_clis(cfg: Config, results: list[tuple[bool, str]]) -> None:
     cat = load_catalog(cfg)
-    avail = available(cfg)
     if not cfg.agents:
         results.append((False, t(cat, "cli.doctor.roster_none")))
         return
@@ -354,9 +353,11 @@ def _doctor_duckdb(cfg: Config, results: list[tuple[bool, str]]) -> None:
             rid = str(uuid.uuid4())
             con.execute("BEGIN TRANSACTION")
             con.execute("INSERT INTO t VALUES (?, ?)", [rid, 1])
-            n = con.execute("SELECT count(*) FROM t WHERE id = ?", [rid]).fetchone()[0]
+            n_row = con.execute("SELECT count(*) FROM t WHERE id = ?", [rid]).fetchone()
+            n = n_row[0] if n_row else 0
             con.execute("ROLLBACK")
-            after = con.execute("SELECT count(*) FROM t").fetchone()[0]
+            after_row = con.execute("SELECT count(*) FROM t").fetchone()
+            after = after_row[0] if after_row else -1
             if n == 1 and after == 0:
                 results.append((True, t(cat, "cli.doctor.duckdb_verified")))
             else:
@@ -536,7 +537,7 @@ def cmd_run(args: argparse.Namespace) -> int:
         return 0
 
     try:
-        app = build(cfg) if _accepts_cfg(build) else build()
+        app = build(cfg)   # build(cfg) is the stable signature (graph.build)
         final = app.invoke(
             {"task": args.task, "project_hint": args.project or ""},
             config={"recursion_limit": 60},
@@ -553,7 +554,11 @@ def cmd_run(args: argparse.Namespace) -> int:
 
         _emit(_json.dumps(final, default=str))
     else:
-        _emit("\n" + (final.get("report") if isinstance(final, dict) else str(final)) or t(cat, "report.none_produced"))
+        if isinstance(final, dict):
+            body = final.get("report") or t(cat, "report.none_produced")
+        else:
+            body = str(final)
+        _emit("\n" + body)
     return 0
 
 

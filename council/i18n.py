@@ -77,7 +77,7 @@ def load_catalog(cfg_or_locale: Union[Config, str, None] = None) -> dict[str, st
     return catalog
 
 
-def t(catalog: Mapping[str, str] | None, key: str, **slots: object) -> str:
+def t(catalog: Mapping[str, str] | None, key: str, /, **slots: object) -> str:
     """Resolve ``key`` from ``catalog`` then the canonical English baseline.
 
     Always returns a string: a key absent from both yields the key itself (a loud,

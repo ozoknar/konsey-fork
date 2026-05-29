@@ -27,7 +27,6 @@ from __future__ import annotations
 
 import hashlib
 import os
-import shutil
 import subprocess
 import time
 from dataclasses import dataclass

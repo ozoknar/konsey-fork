@@ -17,7 +17,6 @@ import argparse
 import json
 import textwrap
 
-import pytest
 
 from council.cli import cmd_run
 

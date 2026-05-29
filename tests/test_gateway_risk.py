@@ -15,7 +15,7 @@ import textwrap
 
 import pytest
 
-from council.config import Config, ProjectEntry, load_config
+from council.config import Config, ProjectEntry
 from council.gateway import classify_risk, preflight
 
 

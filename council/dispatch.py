@@ -145,14 +145,9 @@ def _run_graph(task: str, hint: str, cfg: Config):
     """Defensive bridge to graph.build(cfg).invoke. Returns the final state dict, or a
     minimal dict when the graph is unavailable (so dispatch can be exercised in isolation)."""
     try:
-        from .graph import build  # type: ignore[attr-defined]
-        try:
-            final = build(cfg).invoke({"task": task, "project_hint": hint},
-                                      config={"recursion_limit": 60})
-        except TypeError:
-            # tolerate a build() that takes no cfg argument
-            final = build().invoke({"task": task, "project_hint": hint},
-                                   config={"recursion_limit": 60})
+        from .graph import build
+        final = build(cfg).invoke({"task": task, "project_hint": hint},
+                                  config={"recursion_limit": 60})
         return final or {}
     except Exception as e:
         return {"report": f"(graph unavailable: {e})", "decision": {}}
