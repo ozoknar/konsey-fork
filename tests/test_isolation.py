@@ -214,9 +214,13 @@ def test_isolation_check_survives_a_scan_exception(tmp_path, monkeypatch):
 def _init(tmp_path, fake_home, fake_cwd, monkeypatch, capsys):
     monkeypatch.setenv("COUNCIL_HOME", str(tmp_path / "chome"))
     monkeypatch.delenv("COUNCIL_CONFIG", raising=False)
+    # Pin English so these assertions are locale-deterministic regardless of the host's
+    # $LANG (init is now Turkish-first when $LANG is tr* — Faz 0).
+    for v in ("LC_ALL", "LC_MESSAGES", "LANG"):
+        monkeypatch.delenv(v, raising=False)
     monkeypatch.setenv("HOME", str(fake_home))
     monkeypatch.chdir(fake_cwd)
-    rc = cmd_init(argparse.Namespace(quick=True, reconfigure=False))
+    rc = cmd_init(argparse.Namespace(quick=True, reconfigure=False, locale="en"))
     return rc, capsys.readouterr().out
 
 

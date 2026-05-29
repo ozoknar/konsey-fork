@@ -118,7 +118,7 @@ council audit                 # browse the append-only log (read-only)
 council init                  # (re)run the self-configuring Bootstrap
 ```
 
-The legacy `konsey …` alias is kept and behaves identically.
+`konsey …` is a maintained alias of `council …` and behaves identically (the help banner and `--version` reflect whichever name you invoke).
 
 > All subcommands above (`init` / `doctor` / `run` / `status` / `audit` / `config` /
 > `agents` / `enable` / `stop` / `uninstall`) are wired and runnable today — verify with

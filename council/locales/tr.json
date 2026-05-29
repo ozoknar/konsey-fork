@@ -91,7 +91,7 @@
   "cli.enable.no_profile": "Henüz profil yok. Önce `council init` çalıştırın.",
   "cli.enable.now_q": "Autocapture şimdi etkinleştirilsin mi?",
   "cli.enable.usage": "kullanım: council enable capture",
-  "cli.init.ask_locale": "Dil {choices}",
+  "cli.init.ask_locale": "Dil / Language {choices}",
   "cli.init.ask_node": "Düğüm adı (opsiyonel)",
   "cli.init.ask_org": "Organizasyon (opsiyonel)",
   "cli.init.ask_owner": "Sahip etiketi (kullanıcı adınız DEĞİL)",

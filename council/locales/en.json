@@ -91,7 +91,7 @@
   "cli.enable.no_profile": "No profile yet. Run `council init` first.",
   "cli.enable.now_q": "Enable autocapture now?",
   "cli.enable.usage": "usage: council enable capture",
-  "cli.init.ask_locale": "Locale {choices}",
+  "cli.init.ask_locale": "Dil / Language {choices}",
   "cli.init.ask_node": "Node name (optional)",
   "cli.init.ask_org": "Organization (optional)",
   "cli.init.ask_owner": "Owner label (NOT your username)",

@@ -28,6 +28,7 @@ import subprocess
 import sys
 import tempfile
 import uuid
+from dataclasses import replace
 from pathlib import Path
 
 from . import __version__
@@ -111,6 +112,21 @@ def _detect_os() -> str:
         return subprocess.run(["uname", "-s"], capture_output=True, text=True, timeout=5).stdout.strip() or "unknown"
     except Exception:
         return os.name
+
+
+def _detect_locale() -> str | None:
+    """Best-effort OS locale → a supported catalog locale (Article 17).
+
+    Honours true POSIX precedence: the FIRST *set* variable in LC_ALL > LC_MESSAGES >
+    LANG decides (a higher-priority non-Turkish value wins over a lower-priority
+    ``tr``). A ``tr*`` value (e.g. ``tr_TR.UTF-8``) selects Turkish, any other set value
+    selects English. Returns ``None`` when NO locale variable is set, so the caller can
+    fall back to the stored profile / default. No network, no side effects."""
+    for var in ("LC_ALL", "LC_MESSAGES", "LANG"):
+        val = os.environ.get(var, "")
+        if val:                                # first set variable wins (POSIX)
+            return "tr" if val[:2].lower() == "tr" else "en"
+    return None
 
 
 def _detect_backends(extra_path: str) -> tuple[str, str, str]:
@@ -227,9 +243,26 @@ def _render_local_toml(
 
 def cmd_init(args: argparse.Namespace) -> int:
     cfg = load_config()
-    cat = load_catalog(cfg)
     target = cfg.config_path()
     extra_path = cfg.extra_path
+    quick = args.quick
+
+    # Locale FIRST (Article 17): explicit --locale > OS env (LANG/LC_ALL tr*) > config
+    # default. Bind the catalog to it BEFORE any output, and — interactively — confirm it
+    # as the very first question, then RE-BIND, so the whole wizard + banner + next-steps
+    # flow in the chosen language (fixes "asked for Turkish, got English": locale used to
+    # be written to TOML but never re-bound for the running session).
+    initial_locale = (getattr(args, "locale", None) or _detect_locale() or cfg.locale or "en").lower()
+    if initial_locale not in _LOCALES:
+        initial_locale = "en"
+    cat = load_catalog(replace(cfg, locale=initial_locale))
+    if quick:
+        locale = initial_locale
+    else:
+        locale = _ask(t(cat, "cli.init.ask_locale", choices="|".join(_LOCALES)), initial_locale).lower()
+        if locale not in _LOCALES:
+            locale = initial_locale
+        cat = load_catalog(replace(cfg, locale=locale))   # re-bind: rest of init in chosen language
 
     if target.exists() and not args.reconfigure and not args.quick:
         _emit(t(cat, "cli.init.profile_exists", target=target))
@@ -237,7 +270,6 @@ def cmd_init(args: argparse.Namespace) -> int:
             _emit(t(cat, "cli.init.left_untouched"))
             return 0
 
-    quick = args.quick
     _emit(t(cat, "cli.init.bootstrap"))
     _emit(t(cat, "cli.init.council_home", value=cfg.council_home))
     _emit(t(cat, "cli.init.data_home", value=cfg.data_home))
@@ -257,17 +289,13 @@ def cmd_init(args: argparse.Namespace) -> int:
         role = _DEFAULT_ROLES[i] if i < len(_DEFAULT_ROLES) else ROLE_LEAD
         roster.append((name, cli, role, ok))
 
-    # 2) wizard (skipped entirely with --quick → safe defaults)
+    # 2) wizard (skipped entirely with --quick → safe defaults; locale already chosen above)
     if quick:
-        owner, org, node_name = "operator", "", ""
-        locale, regime = "en", "standard"
+        owner, org, node_name, regime = "operator", "", "", "standard"
     else:
         owner = _ask(t(cat, "cli.init.ask_owner"), "operator") or "operator"
         org = _ask(t(cat, "cli.init.ask_org"), "")
         node_name = _ask(t(cat, "cli.init.ask_node"), "")
-        locale = _ask(t(cat, "cli.init.ask_locale", choices="|".join(_LOCALES)), "en").lower()
-        if locale not in _LOCALES:
-            locale = "en"
         regime = _ask(t(cat, "cli.init.ask_regime", choices="|".join(_REGIMES)), "standard").lower()
         if regime not in _REGIMES:
             regime = "standard"
@@ -1064,17 +1092,28 @@ def cmd_uninstall(args: argparse.Namespace) -> int:
 # ---------------------------------------------------------------------------
 
 
+def _prog_name() -> str:
+    """The command name actually invoked (``council`` or its working alias ``konsey``),
+    so help/usage/--version reflect what the user typed. Falls back to ``council`` for
+    ``python -m`` / test invocations."""
+    name = Path(sys.argv[0]).name
+    return name if name in ("council", "konsey") else "council"
+
+
 def build_parser() -> argparse.ArgumentParser:
+    prog = _prog_name()
     p = argparse.ArgumentParser(
-        prog="council",
+        prog=prog,
         description="Multi-agent, evidence-weighted, vendor-independent work orchestrator.",
     )
-    p.add_argument("-V", "--version", action="version", version=f"council {__version__}")
+    p.add_argument("-V", "--version", action="version", version=f"{prog} {__version__}")
     sub = p.add_subparsers(dest="cmd")
 
     sp = sub.add_parser("init", help="bootstrap wizard (auto-detect + write council.local.toml)")
     sp.add_argument("--quick", action="store_true", help="zero questions; safe defaults")
     sp.add_argument("--reconfigure", action="store_true", help="overwrite an existing profile")
+    sp.add_argument("--locale", choices=_LOCALES, default=None,
+                    help="force interface language (else: $LANG/$LC_ALL tr* → tr, otherwise en)")
     sp.set_defaults(func=cmd_init)
 
     sp = sub.add_parser("doctor", help="evidence-based health check")

@@ -37,6 +37,7 @@ dev = [
 
 [project.scripts]
 council = "council.cli:main"
+konsey = "council.cli:main"   # working alias; `council` stays canonical (brand-neutral)
 
 [project.urls]
 Homepage = "https://github.com/OWNER/konsey"

@@ -121,7 +121,7 @@ council audit                 # yalnız-ekleme kaydını gözden geçir (salt-ok
 council init                  # kendini-yapılandıran Bootstrap'ı (yeniden) çalıştır
 ```
 
-Eski `konsey …` alias'ı korunur ve birebir aynı çalışır.
+`konsey …`, `council …` komutunun korunan bir alias'ıdır ve birebir aynı çalışır (yardım başlığı ve `--version` hangi adı çağırdıysanız onu yansıtır).
 
 > Yukarıdaki tüm alt-komutlar (`init` / `doctor` / `run` / `status` / `audit` /
 > `config` / `agents` / `enable` / `stop` / `uninstall`) bugün bağlı ve
