@@ -1,0 +1,104 @@
+# Changelog
+
+All notable changes to this project are documented here.
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+Honesty rule (Constitution Art. 2.1): entries describe only what was verified — no
+unverified "it works" claims. Test evidence is cited where it backs an entry.
+
+## [Unreleased] — Phase 2 (in progress)
+
+### Added
+
+- `council doctor` now emits a **warning when fewer than 2 runnable providers** are on
+  PATH, so a single-provider (advisory-mode) install is surfaced rather than silently
+  accepted.
+
+### Changed
+
+- Fresh-install audit on Linux (Docker `python:3.12-slim`): install → init → doctor →
+  run + `cron` scheduler install/uninstall round-trip + `pytest`, all green; macOS-only
+  backends correctly returned no-ops on Linux without raising.
+- `pyproject.toml` project URLs corrected to the `konsey` repository.
+- `install.sh` prints an informational note when the chosen interpreter is newer than
+  the CI baseline (3.12); the version gate itself is unchanged (`>= 3.12` floor, no
+  upper bound enforced).
+- READMEs (EN + TR) "Status / maturity" updated to reflect the implemented-and-tested
+  MVP (92/92) instead of the earlier "Phase 1 scaffold / documented stubs" wording;
+  stale `(Phase 2)` references to `SECURITY.md` / `CONTRIBUTING.md` removed (both ship
+  now); the subcommand note now lists all wired commands instead of claiming they are
+  "being ported".
+
+### Known limitations
+
+- See [`KNOWN_ISSUES.md`](./KNOWN_ISSUES.md). Outstanding Phase 2 items include live
+  **systemd-timer** and **Windows Task Scheduler** daemon validation (the backends exist
+  but have not been exercised against a running scheduler), full i18n catalog coverage,
+  and multi-config audit isolation.
+
+## [0.1.0] — 2026-05-29 — MVP (Phase 0+1)
+
+First portable, vendor-independent release of the Council orchestrator and doctrine.
+
+### Added
+
+- **CLI** (`council`, with a `konsey` alias): `init`, `doctor`, `run`, `status`,
+  `audit`, `config`, `agents`, `enable`, `stop`, `uninstall` — all wired and runnable.
+- **9-state loop** (`graph.py`): PREFLIGHT → PLAN → CRITIQUE → SYNTHESIZE → EXECUTE →
+  VERIFY → DECIDE → REPORT → MEMORY, with the producer ≠ verifier invariant, a
+  wall-time kill switch, and a consecutive-tool-failure cap.
+- **Configuration contract** (`config.py`): `Config`, `RosterEntry`, `by_role()`,
+  `verifier(exclude=)`, `available()` — the single injection point. All machine-facts
+  arrive from a git-ignored `council.local.toml`; no brand, path, project, or owner
+  identity is baked into the code.
+- **Vendor-neutral adapters** (`adapters.py`): one class per provider CLI
+  (`claude` / `codex` / `agy`), resolved via `adapter_for(cfg, name)`; swapping a
+  provider is a single roster line.
+- **PREFLIGHT gateway** (`gateway.py`): risk classification (public / internal / pii /
+  sensitive / production) plus an always-on secret/PHI fail-safe scan (e.g. `sk-ant`,
+  `AKIA` blocked under `standard`). Sensitive data is never routed to a disallowed or
+  consumer LLM endpoint (Art. 4.5).
+- **Evidence-weighted decide** (`decide.py`): decisions scored on cross-verification,
+  evidence, and tool-success — not a majority vote. Only pii / sensitive / production
+  (or low-confidence) escalate to a human; public/internal complete autonomously in
+  advisory mode (Art. 7.1).
+- **Append-only audit** (`audit.py`, DuckDB): every message, evidence item, decision,
+  and dissent written append-only (no UPDATE / DELETE), enforced at the application
+  layer (tamper-evident, not tamper-proof — Art. 11.2).
+- **Capture / dispatch** (`capture.py`, `dispatch.py`): opt-in autocapture (default
+  OFF) and a single-instance-locked periodic `dispatch tick`.
+- **OS abstraction layer** (`platform/`): `scheduler` (launchd / systemd / schtasks /
+  cron / Null), `notify`, and `secrets` backends — all defaulting to a no-op (`null`)
+  so the core runs without any of them; background automation is opt-in and default
+  OFF.
+- **Advisory mode**: with a single provider, confidence is capped at `0.6` and output
+  is stamped "unverified"; cross-validation requires ≥ 2 independent providers.
+- **Opt-in regulatory regimes** (`regimes/*.toml`, `standard` / `kvkk` / `gdpr` /
+  `hipaa`): regulatory term lists live only in plugins, never in core/audit/capture
+  code — a detection aid, not a compliance guarantee (Art. 4.3).
+- **Council Constitution v7.0.0** (`constitution/`, CC-BY-4.0) — the portable doctrine
+  the orchestrator enforces, licensed separately from the Apache-2.0 code.
+- **Self-configuring install** (`install.sh`, Art. 0 Bootstrap): POSIX, idempotent,
+  sudo-free; detects OS + Python (≥ 3.12 floor), creates an isolated `.venv`, installs
+  pinned deps, then runs `council init` + `council doctor`.
+- **Tooling & docs**: `README.md` / `README.tr.md`, `SECURITY.md`, `CONTRIBUTING.md`,
+  `KNOWN_ISSUES.md`, GitHub CI (ruff + mypy + pytest on macOS + Ubuntu, Python 3.12)
+  and a secret-scan workflow.
+
+### Verified
+
+- **92/92 tests pass** (`python -m pytest`) covering config/bootstrap, the risk gateway,
+  the secret scan, append-only audit, adapters, and decide — on Python 3.12 (the CI
+  baseline and proven floor).
+- **Fresh Linux install** audited end-to-end in Docker `python:3.12-slim` (install →
+  init → doctor → run + cron install/uninstall round-trip + pytest, all green).
+
+### Security / privacy
+
+- No telemetry; all data is local. Providers are invoked as plain subprocesses — no
+  SDK, no API keys in core, no Council-operated server.
+
+[Unreleased]: https://github.com/OWNER/konsey/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/OWNER/konsey/releases/tag/v0.1.0

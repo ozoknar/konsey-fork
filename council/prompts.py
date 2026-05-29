@@ -1,50 +1,35 @@
-"""State prompts for the 9-state machine.
+"""State prompts for the 9-state machine — thin resolver over the i18n catalog.
 
-English is the canonical embedded default (``Config.locale`` defaults to "en").
-Each prompt is a ``str.format``-style template; the orchestrator fills the slots.
-A localized catalog (``locales/{locale}.json``) may override any key by id via
-``i18n.load_catalog`` — the keys here are the fallback contract.
+There are **no embedded natural-language templates here** (Art. 17): every prompt
+string lives in ``locales/en.json`` (canonical) and its mirrors (``tr.json``). This
+module only knows the state *ids* (``plan``/``critique``/… — identifiers, not prose)
+and how to look them up under the ``prompts.`` namespace, falling back to canonical
+English per-key via :func:`council.i18n.t`.
 
-Keeping the prompts out of ``graph.py`` is the i18n injection point: swapping the
-wording (or the language) never touches the state machine.
+Keeping the prompts out of ``graph.py`` *and* out of this module's source is the i18n
+injection point: swapping the wording or the language never touches Python.
 """
 from __future__ import annotations
 
 from typing import Mapping
 
-# --- Canonical English prompt templates, keyed by state. ---
-_EN: dict[str, str] = {
-    "plan": (
-        "Task: {task}\n"
-        "Give your own independent plan/answer: steps, assumptions, risks. "
-        "Be short and concrete."
-    ),
-    "critique": (
-        "Council task: {task}\nDraft plans:\n{plans}\n\n"
-        "Critique adversarially: disagreements, missing steps, hidden risks. "
-        "If you fundamentally disagree with the majority direction, put 'DISSENT:' on the "
-        "first line with your reasoning. Be short."
-    ),
-    "synthesize": (
-        "Task: {task}\nPlans:\n{plans}\n\nCritique:\n{critique}\n\n"
-        "Produce ONE joint plan/approach that merges them all (Joint Plan). "
-        "Short, owned steps."
-    ),
-    "execute": (
-        "Task: {task}\nJoint plan:\n{joint_plan}\n\n"
-        "Produce the final output. Concrete, verifiable. Short."
-    ),
-    "verify": (
-        "Task: {task}\nProduced answer:\n{execution}\n\n"
-        "Verify independently: are the factual claims consistent? First line "
-        "'VERDICT: PASS' or 'VERDICT: FAIL', then 1-3 bullet points of reasoning. Short."
-    ),
-}
+from . import i18n
+
+# State ids whose prompt text the 9-state machine resolves from the catalog.
+# These are machine identifiers (not translatable prose); the prose lives in locales/.
+PROMPT_KEYS: tuple[str, ...] = ("plan", "critique", "synthesize", "execute", "verify")
+
+_NS = "prompts."
+
+
+def catalog_key(key: str) -> str:
+    """The namespaced catalog id for a state ``key`` (e.g. 'plan' → 'prompts.plan')."""
+    return f"{_NS}{key}"
 
 
 def prompt(key: str, catalog: Mapping[str, str] | None = None, **slots: object) -> str:
-    """Resolve prompt ``key`` from ``catalog`` (locale override) then the English
-    fallback, and fill ``{slots}``. Missing slots raise — a prompt template and its
-    caller must agree, and a silent blank prompt is worse than a loud error."""
-    template = (catalog or {}).get(key) or _EN[key]
+    """Resolve prompt ``key`` from ``catalog`` (locale override) then the canonical
+    English catalog, and fill ``{slots}``. Missing slots raise — a prompt template and
+    its caller must agree, and a silent blank prompt is worse than a loud error."""
+    template = i18n.t(catalog, catalog_key(key))
     return template.format(**slots)

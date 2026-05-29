@@ -4,7 +4,8 @@
 #   ./install.sh [--quick] [--no-init] [--prefix DIR] [--python PY]
 #
 # What it does (download–inspect–run friendly: read it before piping):
-#   1. Detect OS + Python (>=3.12 required; the proven-working floor).
+#   1. Detect OS + Python (>=3.12 required; the proven-working floor. CI pins 3.12;
+#      newer interpreters such as 3.14 run the suite green but are not the CI baseline).
 #   2. Create an isolated virtualenv under the repo (.venv) — never touches system Python.
 #   3. Install pinned dependencies from requirements.txt.
 #   4. Install this package (editable) so the `council` console-script exists.
@@ -80,6 +81,16 @@ PY="$(find_python)" || die "Python >= 3.12 is required (proven-working floor) bu
    Install Python 3.12+ and re-run, or pass --python /path/to/python3.12"
 PYVER="$("$PY" -c 'import sys;print("%d.%d.%d"%sys.version_info[:3])')"
 say "   python   : $PY ($PYVER)"
+
+# Informational only — does NOT gate the install. 3.12 is the floor *and* the CI
+# baseline (.github/workflows/ci.yml); 3.13/3.14 are known to run the suite green but
+# are not the pinned CI version. Flag anything newer so the user knows it is untested-in-CI.
+PYMINOR="$("$PY" -c 'import sys;print(sys.version_info[1])')"
+if [ "$PYMINOR" -gt 12 ] 2>/dev/null; then
+    say "   note     : Python 3.$PYMINOR is newer than the CI baseline (3.12). It is expected"
+    say "              to work, but CI is pinned to 3.12 — if anything looks off, reproduce on"
+    say "              3.12 before filing."
+fi
 
 # --- 3. isolated virtualenv (idempotent) --------------------------------------
 if [ ! -x "$VENV_DIR/bin/python" ]; then

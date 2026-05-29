@@ -1,8 +1,9 @@
 # Known Limitations / Bilinen Sınırlar (Phase 2 backlog)
 
 > Honest scope statement (Constitution Art. 2.1 — no unverified "it works" claims).
-> The MVP core is functional and tested (92/92, incl. a fresh Linux Docker install); the items below are deliberately
-> deferred to Phase 2 and must NOT be presented as already-complete.
+> The MVP core is functional and tested (92/92, incl. a fresh Linux Docker install). The items in the
+> two sections below are deliberately deferred and must NOT be presented as already-complete; items that
+> have since been fixed and verified are moved down to the **Resolved** sections (with their evidence).
 
 ## EN
 
@@ -21,17 +22,12 @@
   classification (live `run` path applies them).
 - **i18n catalog coverage.** `locales/en.json` is canonical; `tr.json` and full prompt
   externalization are partial — some strings remain English-default.
-- **Linux/Windows OS layers** (`platform/scheduler`, `secrets`): the **cron scheduler + Null\*
-  fallbacks are now validated on Linux** (Docker `python:3.12-slim` fresh-install audit:
-  install → init → doctor → run + cron install/uninstall round-trip + pytest 92/92, all green;
-  macOS backends called on Linux returned None/False without raising). Still unvalidated with a
-  live daemon: **systemd-timer / Windows Task Scheduler**.
-- **Regime term-file presence (fail-open edge).** The secret scan is always on (verified:
-  sk-ant / AKIA blocked under `standard`). But clinical/identity detection needs the regime
-  *term file* (`regimes/*.toml`) installed — setting `data_regime=hipaa` WITHOUT the term file
-  silently yields no clinical detection. `council doctor` should warn when a regulated regime is
-  set but no term file loads (Phase 2). Generic tools ship example terms only; the operator
-  activates them — by design, but the missing-file case must warn, not fail-open silently.
+- **Live-daemon scheduler validation (systemd / Windows).** The `cron` scheduler + `Null*`
+  fallbacks are validated on Linux (see Resolved). Still **unvalidated against a running
+  daemon: systemd user timers and Windows Task Scheduler.** Both backends exist
+  (`platform/scheduler.py`) and are reversible via `uninstall()`, but have not been exercised
+  with a live timer/scheduled task. Until then, on those OSes prefer the `cron` backend (Linux)
+  or run `council dispatch tick` manually.
 
 ## TR
 
@@ -47,10 +43,30 @@
   `council.local`'daki proje risk-sicili / veri-rejimi dry-run sınıflandırmasına henüz
   uygulanmıyor (canlı `run` yolu uygular).
 - **i18n kataloğu.** `en.json` kanonik; `tr.json` ve tam prompt dışsallaştırması kısmi.
-- **Linux/Windows OS katmanları** soyutlandı ama yalnız macOS yolu test-edildi; systemd/schtasks
-  doğrulanacak iskeletler.
+- **Canlı-daemon scheduler doğrulaması (systemd / Windows).** `cron` scheduler + `Null*`
+  fallback'leri Linux'ta doğrulandı (bkz. Resolved). **Çalışan bir daemon'a karşı henüz
+  doğrulanmadı: systemd kullanıcı timer'ları ve Windows Task Scheduler.** İki backend de
+  (`platform/scheduler.py`) mevcut ve `uninstall()` ile geri-alınabilir, ama canlı bir
+  timer/scheduled-task ile denenmedi. O zamana dek bu OS'larda `cron` backend'ini (Linux)
+  tercih edin ya da `council dispatch tick`'i elle çalıştırın.
 
-## Resolved this round (cross-provider council found, fixed + verified)
+## Resolved in Phase 2 (moved out of the backlog above — fixed + verified)
+
+- **Regime term-file fail-open now warns (was Phase 2 in this file).** `council doctor`
+  emits a visible `⚠` when a regulated regime (`kvkk` / `gdpr` / `hipaa`) is set but its
+  `regimes/*.toml` term file did not load — clinical/identity detection OFF, secret scan
+  still on, non-fatal (Art. 4.1). Implemented in `cli._doctor_regime` (wired into
+  `cmd_doctor`) + `gateway.regime_loaded`. Verified live: `data_regime='hipaa'` without a
+  term file yields the warning; `standard` adds nothing.
+- **Linux scheduler / fallback layer validated.** The `cron` scheduler + `Null*` backends
+  are validated on Linux via a fresh-install Docker audit (`python:3.12-slim`: install →
+  init → doctor → run + cron install/uninstall round-trip + pytest 92/92, all green;
+  macOS-only backends called on Linux returned None/False without raising). (Live
+  systemd/Windows daemons remain open above.)
+- **`doctor` advisory-mode visibility.** `doctor` now warns when 0 providers are runnable
+  (CANNOT run) and when fewer than 2 are runnable (advisory mode, no cross-validation).
+
+## Resolved in the MVP audit round (cross-provider council found, fixed + verified)
 
 - **SHOWSTOPPER:** `adapters.adapter_for` was missing → `council run` crashed (Google caught
   it; a Claude integration agent's "91/91, works end-to-end" had hidden it because the import

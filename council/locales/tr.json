@@ -1,4 +1,9 @@
 {
-  "_meta": "Türkçe katalog. Faz 2 durum prompt'larını ve CLI metinlerini doldurur.",
-  "advisory_mode": "Danışman modu: 2'den az bağımsız sağlayıcı; çapraz-doğrulama kapalı, güven tavanı 0.6, çıktı doğrulanmamış damgalı."
+  "_meta": "Türkçe katalog — en.json'un tam aynası. Sözleşme belirteçleri (DISSENT:, VERDICT: PASS/FAIL) makinece eşleştirildiği için İngilizce bırakılır.",
+  "advisory_mode": "Danışman modu: 2'den az bağımsız sağlayıcı; çapraz-doğrulama kapalı, güven tavanı 0.6, çıktı doğrulanmamış damgalı.",
+  "prompts.plan": "Görev: {task}\nKendi bağımsız planını/yanıtını ver: adımlar, varsayımlar, riskler. Kısa ve somut ol.",
+  "prompts.critique": "Konsey görevi: {task}\nTaslak planlar:\n{plans}\n\nÇekişmeli eleştir: anlaşmazlıklar, eksik adımlar, gizli riskler. Çoğunluğun yönüne kökten karşıysan ilk satıra gerekçenle 'DISSENT:' yaz. Kısa ol.",
+  "prompts.synthesize": "Görev: {task}\nPlanlar:\n{plans}\n\nEleştiri:\n{critique}\n\nHepsini birleştiren TEK ortak plan/yaklaşım üret (Ortak Plan). Kısa, sahiplenilmiş adımlar.",
+  "prompts.execute": "Görev: {task}\nOrtak plan:\n{joint_plan}\n\nNihai çıktıyı üret. Somut, doğrulanabilir. Kısa.",
+  "prompts.verify": "Görev: {task}\nÜretilen yanıt:\n{execution}\n\nBağımsız doğrula: olgusal iddialar tutarlı mı? İlk satır 'VERDICT: PASS' veya 'VERDICT: FAIL', sonra 1-3 madde gerekçe. Kısa."
 }

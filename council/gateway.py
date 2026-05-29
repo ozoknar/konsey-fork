@@ -145,6 +145,25 @@ def _load_regime_terms(cfg: Config) -> tuple[list[str], list[re.Pattern[str]]]:
     return terms, patterns
 
 
+def regime_loaded(cfg: Config) -> bool:
+    """True iff a *regulated* data regime is active AND its term plugin actually
+    loaded at least one term/identifier (Article 4.1 fail-open guard).
+
+    Returns False when:
+      * the regime is ``standard`` (no plugin expected — not a misconfiguration), or
+      * a regulated regime is set but ``regimes/<regime>.toml`` is missing/empty/broken
+        (the dangerous fail-open case: detection silently disabled).
+
+    ``council doctor`` uses this to surface a VISIBLE warning so ``data_regime=hipaa``
+    without a term file is never mistaken for active clinical detection. The secret
+    scan is always on regardless; this only concerns the regime term plugin."""
+    regime = (cfg.data_regime or "standard").strip().lower()
+    if regime not in _REGULATED_REGIMES:
+        return False
+    terms, patterns = _load_regime_terms(cfg)
+    return bool(terms or patterns)
+
+
 def _regime_hit(text: str, cfg: Config) -> bool:
     """True if the active regulatory regime's clinical/identity markers appear in text."""
     terms, patterns = _load_regime_terms(cfg)

@@ -450,6 +450,31 @@ def _doctor_graph(cfg: Config, results: list[tuple[bool, str]]) -> None:
         results.append((False, "graph: build/adapter_for not callable"))
 
 
+def _doctor_regime(cfg: Config, results: list[tuple[bool, str]]) -> None:
+    """Fail-open guard (Article 4.1): a regulated data regime is only a detection aid
+    if its term file actually loaded. ``data_regime=hipaa`` WITHOUT regimes/hipaa.toml
+    silently yields no clinical detection — surface it as a VISIBLE ⚠ (non-fatal:
+    the secret scan is always on, and an operator may legitimately not have installed
+    terms yet)."""
+    regime = (cfg.data_regime or "standard").strip().lower()
+    try:
+        from .gateway import regime_loaded
+    except Exception:
+        return
+    if regime not in {"kvkk", "gdpr", "hipaa"}:
+        return
+    if regime_loaded(cfg):
+        results.append((True, f"regime: '{regime}' term plugin loaded (clinical/identity detection active)"))
+    else:
+        plugin = Path(cfg.council_home) / "regimes" / f"{regime}.toml"
+        results.append((
+            True,
+            f"⚠ data_regime='{regime}' set but NO term file loaded ({plugin}) — clinical/identity "
+            "detection is OFF (secret scan still on). Install the regime term file to activate it "
+            "(Article 4.1, non-fatal).",
+        ))
+
+
 def cmd_doctor(args: argparse.Namespace) -> int:
     cfg = load_config()
     results: list[tuple[bool, str]] = []
@@ -462,6 +487,7 @@ def cmd_doctor(args: argparse.Namespace) -> int:
     _doctor_append_only(cfg, results)
     _doctor_gateway(cfg, results)
     _doctor_graph(cfg, results)
+    _doctor_regime(cfg, results)
 
     _emit("council doctor — evidence-based health check\n")
     critical_fail = False
@@ -497,7 +523,9 @@ def cmd_run(args: argparse.Namespace) -> int:
         except Exception:
             _err("council run --dry-run: gateway not available.")
             return 2
-        res = preflight(args.task, args.project or "")
+        # Pass cfg so the project risk-registry + data-regime from council.local
+        # apply to dry-run classification, matching the live `run` path (KNOWN_ISSUES).
+        res = preflight(args.task, args.project or "", cfg=cfg)
         if args.json:
             import json as _json
 

@@ -120,9 +120,10 @@ council init                  # (re)run the self-configuring Bootstrap
 
 The legacy `konsey …` alias is kept and behaves identically.
 
-> The runnable entry point today is `council.cli:main` (`council --version`). The full
-> subcommand wiring (`run` / `doctor` / `audit` / `init`) is being ported in Phase 2 —
-> see [Maturity](#9-status--maturity) for what is real today.
+> All subcommands above (`init` / `doctor` / `run` / `status` / `audit` / `config` /
+> `agents` / `enable` / `stop` / `uninstall`) are wired and runnable today — verify with
+> `council --help`. See [Maturity](#9-status--maturity) for what has been exercised on
+> which platform.
 
 ## 7. Configuration
 
@@ -173,21 +174,32 @@ ceiling/floor, append-only) can be *tightened* by a profile or session, never
 
 ## 9. Status / maturity
 
-**Honest, current state — Phase 1 scaffold.**
+**Honest, current state — v0.1.0 MVP (Phase 0+1 complete, Phase 2 in progress).**
 
-- `council/config.py` (the configuration contract: `Config`, `RosterEntry`,
-  `by_role()`, `verifier(exclude=)`, `available()`) is **implemented and
-  import-verified**.
-- The remaining core modules (`graph` / `adapters` / `gateway` / `decide` / `audit` /
-  `capture` / `dispatch`) are **documented stubs** to be ported in Phase 2 against the
-  `Config` contract; the loop, kill switch, and retry caps are specified but not yet
-  wired end-to-end.
+- The core is **implemented and tested**: the full CLI (`init` / `doctor` / `run` /
+  `status` / `audit` / `config` / `agents` / `enable` / `stop` / `uninstall`) plus the
+  modules behind it — `config` / `adapters` / `gateway` / `decide` / `graph` (the
+  9-state loop) / `audit` / `capture` / `dispatch`. The configuration contract
+  (`Config`, `RosterEntry`, `by_role()`, `verifier(exclude=)`, `available()`) is the
+  single injection point.
+- **Test evidence: 92/92 pass** (`python -m pytest`), covering config/bootstrap, the
+  risk gateway, the secret scan, append-only audit, adapters, and the evidence-weighted
+  decide. Verified on Python 3.12 (the CI baseline and the proven floor). Newer
+  interpreters (3.13/3.14) are expected to work but 3.12 is what CI pins.
+- **Verified platforms.** macOS is the primary development target. A **fresh Linux
+  install was audited end-to-end** (Docker `python:3.12-slim`: install → init → doctor
+  → run + `cron` scheduler install/uninstall round-trip + pytest 92/92, all green); the
+  macOS-only backends correctly returned no-ops on Linux without raising. **Not yet
+  exercised with a live background daemon: systemd user timers and Windows Task
+  Scheduler** — those backends exist but are unvalidated against a running scheduler
+  (see [`KNOWN_ISSUES.md`](./KNOWN_ISSUES.md)).
 - Across the OS abstraction layer, the **scheduler / notify / secret backends** default
-  to a no-op (`null`) implementation, so core runs without any of them. macOS is the
-  most battle-tested target; Linux and Windows (WSL2) are in progress.
+  to a no-op (`null`) implementation, so core runs without any of them; background
+  automation is opt-in and **default OFF**.
 
 This README does not claim more than the code currently delivers; check
-`council doctor` for the live, evidence-based status on your machine.
+`council doctor` for the live, evidence-based status on your machine, and
+[`KNOWN_ISSUES.md`](./KNOWN_ISSUES.md) for the deferred items.
 
 ## 10. Privacy & security
 
@@ -200,15 +212,15 @@ This README does not claim more than the code currently delivers; check
 - **The append-only audit is tamper-*evident*, not tamper-*proof*.** Append-only is
   enforced at the application layer; a process running as the same OS user could still
   rewrite the file. OS-level immutability is **not** guaranteed (Article 11.2). Read
-  `SECURITY.md` (Phase 2) before processing sensitive data.
+  [`SECURITY.md`](./SECURITY.md) before processing sensitive data.
 - Sensitive data is never sent to a disallowed endpoint or a consumer LLM endpoint —
   that is an unconditional block, not overridable by human approval (Article 4.5).
 
 ## 11. Contributing
 
-Contributions are welcome. The contribution gate (Phase 2 `CONTRIBUTING.md`) requires:
-no secrets, no organization/product names, no absolute paths, and tests with their
-output. Adding a provider is one adapter class / config line; adding a regulatory
+Contributions are welcome. The contribution gate ([`CONTRIBUTING.md`](./CONTRIBUTING.md))
+requires: no secrets, no organization/product names, no absolute paths, and tests with
+their output. Adding a provider is one adapter class / config line; adding a regulatory
 regime is one plugin file — the core does not change. Security issues go through
 **private** disclosure (`SECURITY.md`), never a public issue.
 

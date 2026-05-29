@@ -29,6 +29,7 @@ from .config import (
     available,
 )
 from .decide import decide
+from .exec_policy import classify_command, mark_untrusted, redact_secrets
 from .gateway import preflight as gw_preflight
 from .i18n import load_catalog
 
@@ -51,6 +52,7 @@ class S(TypedDict, total=False):
     critique: str
     joint_plan: str
     execution: str
+    exec_needs_human: bool   # 6.2.2: destructive command in output → human gate before run
     verify_verdict: str
     verify_ok: bool
     verify_retries: int
@@ -84,15 +86,27 @@ def _ask(s: S, cfg: Config, agent: str, prompt_text: str, mtype: str, timeout: i
     """Run one adapter, audit the message + a terminal-exit evidence row, and return
     ``(text, aggregate-delta)``. Adapter resolution goes through the vendor-neutral
     registry (``adapters.adapter_for``); a missing CLI degrades to a tool failure
-    rather than crashing the graph (Article 2.3)."""
+    rather than crashing the graph (Article 2.3).
+
+    EXECUTE security boundary (Article 6.2): the adapter's output is **untrusted
+    external data**. Secrets are redacted before anything is written to the audit log
+    (6.2.5) and the returned text is wrapped with ``mark_untrusted`` so any embedded
+    "new instruction / run this" content is treated as data, not a directive, when it
+    is fed into the next agent's prompt (6.2.3)."""
     from .adapters import adapter_for  # lazy: keeps build(cfg) importable before adapters lands
 
     r = adapter_for(cfg, agent).run(prompt_text, timeout=timeout)
     sid = s["session_id"]
-    audit.message(sid, agent, mtype, {"text": r.text[:4000], "exit": r.exit_code, "secs": r.seconds})
+    # 6.2.5: redact secrets before the model output touches the audit log.
+    safe_text = redact_secrets(r.text)
+    audit.message(sid, agent, mtype, {"text": safe_text[:4000], "exit": r.exit_code, "secs": r.seconds}, cfg=cfg)
     ev = {"agent": agent, "type": "terminal_exit", "ok": r.ok, "secs": r.seconds}
-    audit.evidence(sid, "terminal_exit", f"{agent} {mtype} exit={r.exit_code} ok={r.ok}", agent, "orchestrator")
-    return r.text, {"calls": 1, "tool_failures": 0 if r.ok else 1, "evidence": [ev], "_ok": r.ok}
+    audit.evidence(sid, "terminal_exit", f"{agent} {mtype} exit={r.exit_code} ok={r.ok}", agent,
+                   "orchestrator", cfg=cfg)
+    # 6.2.3: the adapter output is untrusted data — mark it so the next node treats it
+    # as data, not instructions. Already secret-redacted.
+    return mark_untrusted(safe_text), {"calls": 1, "tool_failures": 0 if r.ok else 1,
+                                       "evidence": [ev], "_ok": r.ok}
 
 
 def _first(names: list[str], avail: dict[str, bool]) -> str | None:
@@ -108,17 +122,17 @@ def preflight(s: S, cfg: Config) -> dict:
     gw = gw_preflight(s["task"], s.get("project_hint", ""), cfg)
     avail = available(cfg)
     n_prov = sum(1 for v in avail.values() if v)
-    sid = audit.start_session(s["task"], gw.risk, gw.budget, user=cfg.owner)
+    sid = audit.start_session(s["task"], gw.risk, gw.budget, user=cfg.owner, cfg=cfg)
     out: dict[str, Any] = {
         "risk": gw.risk, "budget": gw.budget, "session_id": sid,
         "t_start": time.time(), "verify_retries": 0,
         "evidence": [], "dissents": [], "calls": 0, "tool_failures": 0,
     }
     audit.message(sid, "orchestrator", "preflight",
-                  {"risk": gw.risk, "providers": avail, "blocked": gw.blocked})
+                  {"risk": gw.risk, "providers": avail, "blocked": gw.blocked}, cfg=cfg)
     if gw.blocked:
         out.update(blocked=True, block_reason=gw.block_reason, killed=True, kill_reason=gw.block_reason)
-        audit.incident(sid, "gateway_block", gw.block_reason)
+        audit.incident(sid, "gateway_block", gw.block_reason, cfg=cfg)
     elif n_prov < 2:
         # Honest default (Article 7.1): a single provider does NOT block — the council
         # runs in advisory mode with no cross-verification and a capped confidence.
@@ -173,7 +187,7 @@ def critique(s: S, cfg: Config) -> dict:
     out: dict[str, Any] = {"critique": text, "calls": d["calls"],
                            "tool_failures": d["tool_failures"], "evidence": d["evidence"]}
     if "DISSENT" in text.upper():
-        audit.dissent(s["session_id"], critic, text[:500])
+        audit.dissent(s["session_id"], critic, text[:500], cfg=cfg)
         out["dissents"] = [{"agent": critic, "rationale": text[:500]}]
     return out
 
@@ -217,9 +231,20 @@ def execute(s: S, cfg: Config) -> dict:
     text, d = _ask(s, cfg, agent,
                    prompts.prompt("execute", cat, task=s["task"], joint_plan=s.get("joint_plan", "")[:2500]),
                    "execute")
-    # Record who produced the output so VERIFY can pick a different agent (producer ≠ verifier).
-    return {"execution": text, "executor": agent, "calls": d["calls"],
-            "tool_failures": d["tool_failures"], "evidence": d["evidence"]}
+    out: dict[str, Any] = {
+        "execution": text, "executor": agent, "calls": d["calls"],
+        "tool_failures": d["tool_failures"], "evidence": d["evidence"],
+    }
+    # Article 6.2.2: if the produced output contains a destructive/privileged command
+    # shape it must NOT auto-run — it routes to a human approval gate (Article 5). This
+    # MVP does not shell out, so enforcement = flag the session so DECIDE forces
+    # human_required and an incident is recorded (the host never runs it unattended).
+    if classify_command(text, sandbox=cfg.exec_sandbox) == "needs_human":
+        out["exec_needs_human"] = True
+        audit.incident(s["session_id"], "destructive_command",
+                       "agent output contains a destructive/privileged command shape "
+                       "(Article 6.2.2) — human approval required before execution", cfg=cfg)
+    return out
 
 
 def verify(s: S, cfg: Config) -> dict:
@@ -248,7 +273,8 @@ def verify(s: S, cfg: Config) -> dict:
                    "verify")
     ok = "PASS" in text.split("\n", 1)[0].upper()
     if ok:
-        audit.evidence(s["session_id"], "cross_validation", f"{verifier} VERDICT PASS", verifier, "orchestrator")
+        audit.evidence(s["session_id"], "cross_validation", f"{verifier} VERDICT PASS", verifier,
+                       "orchestrator", cfg=cfg)
     return {"verify_verdict": text, "verify_ok": ok,
             "verify_retries": s.get("verify_retries", 0) + 1,
             "calls": d["calls"], "tool_failures": d["tool_failures"], "evidence": d["evidence"]}
@@ -271,7 +297,7 @@ def decide_node(s: S, cfg: Config) -> dict:
     if _dead(s):
         dec = {"confidence": 0.0, "human_required": True,
                "rationale": s.get("kill_reason") or s.get("block_reason") or "aborted"}
-        audit.decision(sid, "ABORTED: " + dec["rationale"], 0.0, [], [], False)
+        audit.decision(sid, "ABORTED: " + dec["rationale"], 0.0, [], [], False, cfg=cfg)
         return {"decision": dec}
     n_cross = 1 if s.get("verify_ok") else 0
     dec = decide(
@@ -285,11 +311,19 @@ def decide_node(s: S, cfg: Config) -> dict:
         confidence_floor=cfg.confidence_floor,
         confidence_cap_noxval=cfg.confidence_cap_noxval,
     )
+    # Article 6.2.2: a destructive command in the output can never auto-run — force the
+    # human gate regardless of confidence (immutable core; a high score cannot bypass it).
+    human_required = dec.human_required
+    rationale = dec.rationale
+    if s.get("exec_needs_human"):
+        human_required = True
+        rationale = (rationale + " | " if rationale else "") + \
+            "destructive/privileged command in output — human approval required (Article 6.2.2)"
     audit.decision(sid, (s.get("execution") or "")[:1000], dec.confidence,
                    list(s.get("evidence", [])), list(s.get("dissents", [])),
-                   human_approved=False)
-    return {"decision": {"confidence": dec.confidence, "human_required": dec.human_required,
-                         "rationale": dec.rationale}}
+                   human_approved=False, cfg=cfg)
+    return {"decision": {"confidence": dec.confidence, "human_required": human_required,
+                         "rationale": rationale}}
 
 
 def report(s: S, cfg: Config) -> dict:
@@ -307,6 +341,9 @@ def report(s: S, cfg: Config) -> dict:
         lines += [f"[KILL SWITCH] {s.get('kill_reason')}", ""]
     if s.get("advisory") and not _dead(s):
         lines += [f"[ADVISORY] {s.get('advisory_reason', 'unverified — fewer than two providers')}", ""]
+    if s.get("exec_needs_human") and not _dead(s):
+        lines += ["[EXEC GATE] destructive/privileged command in output — human approval "
+                  "required before execution (Article 6.2.2)", ""]
     if not _dead(s):
         lines += [
             f"**Nodes:** {', '.join(s.get('plans', {}).keys())} ({s.get('providers_ok', 0)} ok)",
@@ -330,7 +367,7 @@ def memory(s: S, cfg: Config) -> dict:
     sid = s.get("session_id")
     status = "aborted" if _dead(s) else "done"
     if sid:
-        audit.end_session(sid, status, round(s.get("calls", 0) * 0.01, 2))
+        audit.end_session(sid, status, round(s.get("calls", 0) * 0.01, 2), cfg=cfg)
     return {}
 
 

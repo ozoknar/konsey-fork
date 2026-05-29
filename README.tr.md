@@ -123,9 +123,10 @@ council init                  # kendini-yapılandıran Bootstrap'ı (yeniden) ç
 
 Eski `konsey …` alias'ı korunur ve birebir aynı çalışır.
 
-> Bugün çalıştırılabilir giriş noktası `council.cli:main` (`council --version`). Tam
-> alt-komut bağlantısı (`run` / `doctor` / `audit` / `init`) Faz 2'de taşınıyor —
-> bugün gerçekte ne çalıştığı için bkz. [Olgunluk](#9-durum--olgunluk).
+> Yukarıdaki tüm alt-komutlar (`init` / `doctor` / `run` / `status` / `audit` /
+> `config` / `agents` / `enable` / `stop` / `uninstall`) bugün bağlı ve
+> çalıştırılabilir — `council --help` ile doğrulayın. Hangi platformda neyin denendiği
+> için bkz. [Olgunluk](#9-durum--olgunluk).
 
 ## 7. Yapılandırma
 
@@ -177,20 +178,32 @@ yalnız-ekleme) bir profil veya oturum tarafından *sıkılaştırılabilir*, as
 
 ## 9. Durum / olgunluk
 
-**Dürüst, güncel durum — Faz 1 iskelet.**
+**Dürüst, güncel durum — v0.1.0 MVP (Faz 0+1 tamam, Faz 2 sürüyor).**
 
-- `council/config.py` (yapılandırma kontratı: `Config`, `RosterEntry`, `by_role()`,
-  `verifier(exclude=)`, `available()`) **uygulandı ve import-doğrulandı**.
-- Kalan çekirdek modüller (`graph` / `adapters` / `gateway` / `decide` / `audit` /
-  `capture` / `dispatch`) `Config` kontratına karşı Faz 2'de taşınacak **belgeli
-  stub'lardır**; döngü, kill switch ve retry eşikleri belirtilmiş ama uçtan uca
-  bağlanmamıştır.
+- Çekirdek **uygulandı ve test edildi**: tam CLI (`init` / `doctor` / `run` /
+  `status` / `audit` / `config` / `agents` / `enable` / `stop` / `uninstall`) ve
+  arkasındaki modüller — `config` / `adapters` / `gateway` / `decide` / `graph`
+  (9-durumlu döngü) / `audit` / `capture` / `dispatch`. Yapılandırma kontratı
+  (`Config`, `RosterEntry`, `by_role()`, `verifier(exclude=)`, `available()`) tek
+  enjeksiyon noktasıdır.
+- **Test kanıtı: 92/92 geçer** (`python -m pytest`); config/bootstrap, risk gateway,
+  secret tarama, yalnız-ekleme audit, adapter'lar ve kanıt-ağırlıklı decide kapsanır.
+  Python 3.12'de (CI tabanı ve kanıtlanmış taban) doğrulandı. Daha yeni yorumlayıcıların
+  (3.13/3.14) çalışması beklenir ama CI 3.12'ye sabitlenmiştir.
+- **Doğrulanan platformlar.** macOS birincil geliştirme hedefidir. **Sıfırdan bir Linux
+  kurulumu uçtan uca denetlendi** (Docker `python:3.12-slim`: install → init → doctor
+  → run + `cron` scheduler kur/kaldır turu + pytest 92/92, hepsi yeşil); yalnız-macOS
+  backend'leri Linux'ta hata fırlatmadan doğru biçimde no-op döndürdü. **Canlı bir arka
+  plan daemon'ı ile henüz denenmedi: systemd kullanıcı timer'ları ve Windows Task
+  Scheduler** — bu backend'ler mevcut ama çalışan bir scheduler'a karşı doğrulanmadı
+  (bkz. [`KNOWN_ISSUES.md`](./KNOWN_ISSUES.md)).
 - OS soyutlama katmanında **scheduler / notify / secret backend'leri** varsayılan
-  olarak no-op (`null`) uygulamadır; çekirdek bunların hiçbiri olmadan çalışır. macOS
-  en çok test edilmiş hedeftir; Linux ve Windows (WSL2) sürmektedir.
+  olarak no-op (`null`) uygulamadır; çekirdek bunların hiçbiri olmadan çalışır. Arka
+  plan otomasyonu opt-in ve **varsayılan KAPALI**.
 
 Bu README, kodun bugün sağladığından fazlasını iddia etmez; makinenizdeki canlı,
-kanıt-temelli durum için `council doctor` çalıştırın.
+kanıt-temelli durum için `council doctor` çalıştırın, ertelenen kalemler için
+[`KNOWN_ISSUES.md`](./KNOWN_ISSUES.md).
 
 ## 10. Gizlilik & güvenlik
 
@@ -204,14 +217,14 @@ kanıt-temelli durum için `council doctor` çalıştırın.
 - **Yalnız-ekleme audit, kurcalama-*kanıtlayıcı*dır, kurcalama-*önleyici* değil.**
   Yalnız-ekleme uygulama katmanında zorlanır; aynı OS kullanıcısında koşan bir süreç
   dosyayı yine de yeniden yazabilir. OS-seviyesi değiştirilemezlik **garanti edilmez**
-  (Madde 11.2). Hassas veri işlemeden önce `SECURITY.md` (Faz 2) okuyun.
+  (Madde 11.2). Hassas veri işlemeden önce [`SECURITY.md`](./SECURITY.md) okuyun.
 - Hassas veri asla izin verilmeyen bir endpoint'e veya tüketici LLM endpoint'ine
   gönderilmez — bu koşulsuz bir bloktur, insan onayıyla bile aşılamaz (Madde 4.5).
 
 ## 11. Katkı
 
-Katkılar memnuniyetle karşılanır. Katkı kapısı (Faz 2 `CONTRIBUTING.md`) şunları
-gerektirir: secret yok, kurum/ürün adı yok, mutlak yol yok ve çıktısıyla birlikte
+Katkılar memnuniyetle karşılanır. Katkı kapısı ([`CONTRIBUTING.md`](./CONTRIBUTING.md))
+şunları gerektirir: secret yok, kurum/ürün adı yok, mutlak yol yok ve çıktısıyla birlikte
 testler. Sağlayıcı eklemek bir adapter sınıfı / config satırıdır; düzenleyici rejim
 eklemek bir eklenti dosyasıdır — çekirdek değişmez. Güvenlik sorunları herkese-açık
 bir issue ile değil, **özel (private)** bildirim ile gider (`SECURITY.md`).
