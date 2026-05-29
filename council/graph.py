@@ -31,7 +31,7 @@ from .config import (
 from .decide import decide
 from .exec_policy import classify_command, mark_untrusted, redact_secrets
 from .gateway import preflight as gw_preflight
-from .i18n import load_catalog
+from .i18n import load_catalog, t
 
 
 class S(TypedDict, total=False):
@@ -75,10 +75,13 @@ def _killcheck(s: S, cfg: Config) -> dict:
     elapsed = time.time() - s.get("t_start", time.time())
     max_wall = b.get("max_wall_s", 900)
     if elapsed > max_wall:
-        return {"killed": True, "kill_reason": f"wall-time exceeded ({int(elapsed)}s > {max_wall}s)"}
-    if s.get("tool_failures", 0) >= cfg.kill_tool_failures:
+        cat = load_catalog(cfg)
         return {"killed": True,
-                "kill_reason": f"{cfg.kill_tool_failures} consecutive tool failures (Art.9.1)"}
+                "kill_reason": t(cat, "graph.kill_wall_time", elapsed=int(elapsed), max_wall=max_wall)}
+    if s.get("tool_failures", 0) >= cfg.kill_tool_failures:
+        cat = load_catalog(cfg)
+        return {"killed": True,
+                "kill_reason": t(cat, "graph.kill_tool_failures", n=cfg.kill_tool_failures)}
     return {}
 
 
@@ -121,6 +124,7 @@ def _first(names: list[str], avail: dict[str, bool]) -> str | None:
 def preflight(s: S, cfg: Config) -> dict:
     gw = gw_preflight(s["task"], s.get("project_hint", ""), cfg)
     avail = available(cfg)
+    cat = load_catalog(cfg)
     n_prov = sum(1 for v in avail.values() if v)
     sid = audit.start_session(s["task"], gw.risk, gw.budget, user=cfg.owner, cfg=cfg)
     out: dict[str, Any] = {
@@ -137,8 +141,8 @@ def preflight(s: S, cfg: Config) -> dict:
         # Honest default (Article 7.1): a single provider does NOT block — the council
         # runs in advisory mode with no cross-verification and a capped confidence.
         out.update(advisory=True,
-                   advisory_reason=f"only {n_prov} provider(s) — cross-verification disabled, "
-                                   f"confidence capped at {cfg.confidence_cap_noxval} (advisory mode)")
+                   advisory_reason=t(cat, "graph.advisory_reason",
+                                     n=n_prov, cap=cfg.confidence_cap_noxval))
     return out
 
 
@@ -242,8 +246,7 @@ def execute(s: S, cfg: Config) -> dict:
     if classify_command(text, sandbox=cfg.exec_sandbox) == "needs_human":
         out["exec_needs_human"] = True
         audit.incident(s["session_id"], "destructive_command",
-                       "agent output contains a destructive/privileged command shape "
-                       "(Article 6.2.2) — human approval required before execution", cfg=cfg)
+                       t(cat, "graph.incident_destructive"), cfg=cfg)
     return out
 
 
@@ -262,12 +265,12 @@ def verify(s: S, cfg: Config) -> dict:
     if not verifier:
         # No independent verifier available → cannot cross-validate. Mark advisory and
         # record verify_ok=False so decide() applies the no-cross-verification cap (Art.7.2).
-        return {"verify_verdict": "(advisory mode: no independent verifier available — unverified)",
+        return {"verify_verdict": t(cat, "graph.verify_advisory_verdict"),
                 "verify_ok": False,
                 "verify_retries": s.get("verify_retries", 0) + 1,
                 "advisory": True,
                 "advisory_reason": s.get("advisory_reason")
-                or "no independent verifier — output marked unverified"}
+                or t(cat, "graph.verify_advisory_reason")}
     text, d = _ask(s, cfg, verifier,
                    prompts.prompt("verify", cat, task=s["task"], execution=s.get("execution", "")[:2500]),
                    "verify")
@@ -294,9 +297,10 @@ def route_after_verify(s: S, cfg: Config) -> str:
 
 def decide_node(s: S, cfg: Config) -> dict:
     sid = s["session_id"]
+    cat = load_catalog(cfg)
     if _dead(s):
         dec = {"confidence": 0.0, "human_required": True,
-               "rationale": s.get("kill_reason") or s.get("block_reason") or "aborted"}
+               "rationale": s.get("kill_reason") or s.get("block_reason") or t(cat, "graph.aborted")}
         audit.decision(sid, "ABORTED: " + dec["rationale"], 0.0, [], [], False, cfg=cfg)
         return {"decision": dec}
     n_cross = 1 if s.get("verify_ok") else 0
@@ -310,6 +314,7 @@ def decide_node(s: S, cfg: Config) -> dict:
         tool_failures=s.get("tool_failures", 0),
         confidence_floor=cfg.confidence_floor,
         confidence_cap_noxval=cfg.confidence_cap_noxval,
+        catalog=cat,
     )
     # Article 6.2.2: a destructive command in the output can never auto-run — force the
     # human gate regardless of confidence (immutable core; a high score cannot bypass it).
@@ -318,7 +323,7 @@ def decide_node(s: S, cfg: Config) -> dict:
     if s.get("exec_needs_human"):
         human_required = True
         rationale = (rationale + " | " if rationale else "") + \
-            "destructive/privileged command in output — human approval required (Article 6.2.2)"
+            t(cat, "graph.decision_destructive")
     audit.decision(sid, (s.get("execution") or "")[:1000], dec.confidence,
                    list(s.get("evidence", [])), list(s.get("dissents", [])),
                    human_approved=False, cfg=cfg)
@@ -328,37 +333,42 @@ def decide_node(s: S, cfg: Config) -> dict:
 
 def report(s: S, cfg: Config) -> dict:
     dec = s.get("decision", {})
+    cat = load_catalog(cfg)
     elapsed = int(time.time() - s.get("t_start", time.time()))
     lines = [
-        f"# Council Report — {s['task']}",
-        f"risk={s.get('risk')} · time={elapsed}s · calls={s.get('calls', 0)} · "
-        f"tool_failures={s.get('tool_failures', 0)} · session={s.get('session_id', '')[:8]}",
+        t(cat, "report.title", task=s["task"]),
+        t(cat, "report.meta", risk=s.get("risk"), elapsed=elapsed, calls=s.get("calls", 0),
+          tool_failures=s.get("tool_failures", 0), session=s.get("session_id", "")[:8]),
         "",
     ]
     if s.get("blocked"):
-        lines += [f"[BLOCKED] gateway: {s.get('block_reason')}", ""]
+        lines += [t(cat, "report.blocked", reason=s.get("block_reason")), ""]
     if s.get("killed") and not s.get("blocked"):
-        lines += [f"[KILL SWITCH] {s.get('kill_reason')}", ""]
+        lines += [t(cat, "report.kill_switch", reason=s.get("kill_reason")), ""]
     if s.get("advisory") and not _dead(s):
-        lines += [f"[ADVISORY] {s.get('advisory_reason', 'unverified — fewer than two providers')}", ""]
+        lines += [t(cat, "report.advisory",
+                    reason=s.get("advisory_reason") or t(cat, "report.advisory_default")), ""]
     if s.get("exec_needs_human") and not _dead(s):
-        lines += ["[EXEC GATE] destructive/privileged command in output — human approval "
-                  "required before execution (Article 6.2.2)", ""]
+        lines += [t(cat, "report.exec_gate"), ""]
     if not _dead(s):
         lines += [
-            f"**Nodes:** {', '.join(s.get('plans', {}).keys())} ({s.get('providers_ok', 0)} ok)",
+            t(cat, "report.nodes", names=", ".join(s.get("plans", {}).keys()),
+              n=s.get("providers_ok", 0)),
             "",
-            "## Final output", (s.get("execution") or "")[:3000], "",
-            f"## Verification\n{s.get('verify_verdict', '(none)')[:800]}", "",
+            t(cat, "report.final_output"), (s.get("execution") or "")[:3000], "",
+            t(cat, "report.verification",
+              verdict=s.get("verify_verdict", t(cat, "report.verification_none"))[:800]), "",
         ]
     if s.get("dissents"):
-        lines += ["## Dissent"] + [f"- [{d['agent']}] {d['rationale'][:300]}" for d in s["dissents"]] + [""]
+        lines += [t(cat, "report.dissent_heading")] + \
+            [t(cat, "report.dissent_item", agent=d["agent"], rationale=d["rationale"][:300]) for d in s["dissents"]] + [""]
+    yesno = t(cat, "report.human_required_yes") if dec.get("human_required") else t(cat, "report.human_required_no")
     lines += [
-        "## Decision",
-        f"- confidence: **{dec.get('confidence')}**",
-        f"- human approval required: **{'YES' if dec.get('human_required') else 'no'}**",
-        f"- rationale: {dec.get('rationale')}",
-        f"- evidence count: {len(s.get('evidence', []))}",
+        t(cat, "report.decision_heading"),
+        t(cat, "report.confidence", confidence=dec.get("confidence")),
+        t(cat, "report.human_required", value=yesno),
+        t(cat, "report.rationale", rationale=dec.get("rationale")),
+        t(cat, "report.evidence_count", n=len(s.get("evidence", []))),
     ]
     return {"report": "\n".join(lines)}
 

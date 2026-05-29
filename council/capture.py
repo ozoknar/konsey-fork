@@ -37,6 +37,7 @@ from pathlib import Path
 import duckdb
 
 from .config import ROLE_DISTILLER, Config, load_config
+from .i18n import load_catalog, t
 
 COLD_MIN = 25            # minutes of transcript idle before a session is "cold"
 KEEP_BACKUPS = 14        # daily DB snapshots retained
@@ -347,20 +348,21 @@ def _distill_gate(gate_text: str, cfg: Config) -> tuple[bool, str]:
     the distiller (Article 4 / 13). ``gate_text`` is the raw, untruncated transcript."""
     if not gate_text.strip():
         return False, ""
+    cat = load_catalog(cfg)
     term_pat, ident_pats = _load_regime(cfg)
     folded = _fold(gate_text)
     if _classify_risk(gate_text, cfg) in ("sensitive", "phi"):
-        return True, "regime/sensitive-data indicator (risk=sensitive)"
+        return True, t(cat, "capture.gate_sensitive")
     if term_pat is not None and term_pat.search(folded):
-        return True, "regime term indicator"
+        return True, t(cat, "capture.gate_regime_term")
     for ip in ident_pats:
         if ip.search(gate_text):
-            return True, "regime identifier pattern"
+            return True, t(cat, "capture.gate_regime_identifier")
     patterns = _secret_patterns()
     gate_secrets = _gate_secret_patterns(patterns)
     hits = [name for name, pat in gate_secrets.items() if pat.search(gate_text)]
     if hits:
-        return True, f"secret={sorted(hits)[:4]}"
+        return True, t(cat, "capture.gate_secret", secrets=sorted(hits)[:4])
     return False, ""
 
 
@@ -400,17 +402,11 @@ def _distill(cfg: Config, text: str, label: str):
     """Summarise a session into one audit record. F7: mask the FULL text first, THEN trim."""
     if not text.strip():
         return None
+    cat = load_catalog(cfg)
     masked = _mask(text, _secret_patterns())                 # F7: mask before truncation
     if len(masked) > _DISTILL_MAX:
-        masked = masked[:30000] + "\n...[truncated]...\n" + masked[-10000:]
-    prompt = (
-        f"Below is a transcript of an agent/coding session (project: {label}). "
-        "Summarise it into ONE council audit record. Return ONLY this JSON:\n"
-        '{"topic":"<=80 chars","risk":"public|internal|pii|production",'
-        '"decision":"<=300 chars what was done/decided","confidence":0.0,"refs":["PR/commit/file"]}\n'
-        "HARD RULE: never put any API key, token, password, secret, or patient identifier "
-        "in your output.\n\n"
-        f"---SESSION---\n{masked}")
+        masked = masked[:30000] + t(cat, "capture.truncated") + masked[-10000:]
+    prompt = t(cat, "capture.distill_prompt", label=label, masked=masked)
     r = _distiller_run(cfg, prompt, timeout=120)
     if r is None:
         return None
@@ -428,6 +424,7 @@ def process_capture(cfg: Config | None = None) -> int:
     """Process the capture queue. Cold-only; inert unless autocapture is enabled with a
     configured bridge_dir. (F1: no lock — the scheduler tick holds the single-instance flock.)"""
     cfg = cfg or load_config()
+    cat = load_catalog(cfg)
     bridge = _Bridge(cfg)
     if not bridge.active:
         return 0                                       # inert: opt-in OFF or no bridge_dir
@@ -479,15 +476,14 @@ def process_capture(cfg: Config | None = None) -> int:
 
         risk = _classify_risk(gate_text, cfg) if gate_text else "internal"
         blocked, why = _distill_gate(gate_text, cfg)
-        seg = " [resume]" if resume else ""
+        seg = t(cat, "capture.resume_seg") if resume else ""
 
         if blocked:                                    # GATE (Article 4): do not distil
             _append(
                 cfg,
-                topic=f"[auto-capture {src}{seg}] {label} — GATED ({why})",
+                topic=t(cat, "capture.topic_gated", src=src, seg=seg, label=label, why=why),
                 risk=risk,
-                decision=(f"Session captured but {why} detected → distillation SKIPPED "
-                          "(Article 4/13). queue-human; needs human review."),
+                decision=t(cat, "capture.decision_gated", why=why),
                 conf=None,
                 refs={"source": "auto-capture", "gated": True, "reason": why, "cwd": cwd, "sid": sid},
                 human_approved=None, src=src)
@@ -497,7 +493,8 @@ def process_capture(cfg: Config | None = None) -> int:
             if s and s.get("decision"):
                 _append(
                     cfg,
-                    topic=f"[auto-capture {src}{seg}] {str(s.get('topic') or label)[:80]}",
+                    topic=t(cat, "capture.topic_distilled", src=src, seg=seg,
+                            topic=str(s.get("topic") or label)[:80]),
                     risk=(s.get("risk") if s.get("risk") in ("public", "internal", "pii", "sensitive", "production")
                           else risk),
                     decision=str(s.get("decision"))[:600],
@@ -508,10 +505,10 @@ def process_capture(cfg: Config | None = None) -> int:
             else:                                      # F4: skeleton — the first request is MASKED
                 _append(
                     cfg,
-                    topic=f"[auto-capture {src}{seg}] {label}",
+                    topic=t(cat, "capture.topic_skeleton", src=src, seg=seg, label=label),
                     risk=risk,
-                    decision=("Session recorded (skeleton). First request: "
-                              f"{_mask(_first_user(convo), _secret_patterns())[:160]}"),
+                    decision=t(cat, "capture.decision_skeleton",
+                               first=_mask(_first_user(convo), _secret_patterns())[:160]),
                     conf=None,
                     refs={"source": "auto-capture-skeleton", "cwd": cwd, "sid": sid},
                     human_approved=None, src=src)
@@ -582,10 +579,11 @@ def write_recall_cache(cfg: Config | None = None) -> None:
         con.close()
     except Exception:
         return
-    lines = ["# Council — latest audit state (automatic recall)"]
+    cat = load_catalog(cfg)
+    lines = [t(cat, "capture.recall_title")]
     for r in rows:
-        lines.append(f"- {str(r[0])[:16]} [{r[1]}] {r[2]}")
-    lines.append("Living history: council DB + logs/.")
+        lines.append(t(cat, "capture.recall_item", ts=str(r[0])[:16], risk=r[1], topic=r[2]))
+    lines.append(t(cat, "capture.recall_footer"))
     out = {"hookSpecificOutput": {"hookEventName": "SessionStart",
                                   "additionalContext": "\n".join(lines)}}
     try:

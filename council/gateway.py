@@ -24,6 +24,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from .config import Config
+from .i18n import load_catalog, t
 
 # --- Generic prod / pii / public signals (provider- and project-name-independent) ---
 # These are language-and-intent signals, not brand names. A project name alone
@@ -221,6 +222,7 @@ def preflight(task: str, project_hint: str = "", cfg: Config | None = None) -> G
     is blocked from going to the council unmasked / without human approval."""
     if cfg is None:
         cfg = Config()
+    cat = load_catalog(cfg)
 
     risk = classify_risk(task, project_hint, cfg)
     budget = BUDGET.get(risk, BUDGET["internal"])
@@ -230,22 +232,15 @@ def preflight(task: str, project_hint: str = "", cfg: Config | None = None) -> G
 
     if risk == "sensitive":
         res.blocked = True
-        res.block_reason = (
-            "Sensitive-data class: regulated data must not be sent to a consumer LLM "
-            "endpoint unmasked (Article 4.5). A local pipeline + human approval is required. "
-            "Note: the data regime is a detection aid, NOT a legal-compliance guarantee."
-        )
+        res.block_reason = t(cat, "gateway.block_sensitive")
     if secrets:
         res.blocked = True
         res.block_reason = (res.block_reason + " | " if res.block_reason else "") + \
-            f"Secret/identity detected: {secrets} (Article 4.2) — does not reach the council unmasked."
+            t(cat, "gateway.block_secret", secrets=secrets)
 
     if risk in ("sensitive", "production"):
-        res.notes.append("Human approval required (Article 5).")
+        res.notes.append(t(cat, "gateway.note_human_approval"))
     if cfg.data_regime and cfg.data_regime.strip().lower() in _REGULATED_REGIMES:
-        res.notes.append(
-            f"Regime '{cfg.data_regime}' active: detection aid only, not a compliance guarantee "
-            "(Article 4.3); liability is the operator's."
-        )
+        res.notes.append(t(cat, "gateway.note_regime", regime=cfg.data_regime))
 
     return res

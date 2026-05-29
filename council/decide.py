@@ -12,6 +12,9 @@ test or a different deployment can override them without monkey-patching.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Mapping
+
+from .i18n import t
 
 # Defaults mirror council.config module constants; the caller normally overrides
 # them from Config so a single instance can be tuned without editing core.
@@ -37,6 +40,7 @@ def decide(
     tool_failures: int,
     confidence_floor: float = DEFAULT_CONFIDENCE_FLOOR,
     confidence_cap_noxval: float = DEFAULT_CONFIDENCE_CAP_NOXVAL,
+    catalog: Mapping[str, str] | None = None,
 ) -> Decision:
     """Score a decision on evidence, not on a majority vote (Article 7).
 
@@ -75,13 +79,15 @@ def decide(
     human = (risk in _SENSITIVE) or low_conf_gate
     reasons: list[str] = []
     if risk in _SENSITIVE:
-        reasons.append(f"risk={risk} → human approval required (Art.5/7)")
+        reasons.append(t(catalog, "decide.human_required_risk", risk=risk))
     if low_conf_gate:
-        reasons.append(f"confidence={confidence} < {confidence_floor} on risk={risk} → human approval (Art.7.1)")
+        reasons.append(t(catalog, "decide.low_conf_gate",
+                         confidence=confidence, confidence_floor=confidence_floor, risk=risk))
     elif confidence < confidence_floor:
-        reasons.append(f"confidence={confidence} < {confidence_floor} → advisory/unverified; {risk} completes autonomously (Art.7.1)")
+        reasons.append(t(catalog, "decide.low_conf_advisory",
+                         confidence=confidence, confidence_floor=confidence_floor, risk=risk))
     if n_crossverified == 0:
-        reasons.append("no cross-verification → consensus alone is not a decision (Art.7.2)")
+        reasons.append(t(catalog, "decide.no_crossverification"))
     if not reasons:
-        reasons.append("evidence-weighted threshold met")
+        reasons.append(t(catalog, "decide.threshold_met"))
     return Decision(confidence=confidence, human_required=human, rationale="; ".join(reasons))

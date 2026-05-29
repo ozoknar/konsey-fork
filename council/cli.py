@@ -39,6 +39,7 @@ from .config import (
     available,
     load_config,
 )
+from .i18n import load_catalog, t
 
 # ---------------------------------------------------------------------------
 # tiny terminal helpers (no color dependency; degrade to plain text)
@@ -213,33 +214,30 @@ def _render_local_toml(
 
 def cmd_init(args: argparse.Namespace) -> int:
     cfg = load_config()
+    cat = load_catalog(cfg)
     target = cfg.config_path()
     extra_path = cfg.extra_path
 
     if target.exists() and not args.reconfigure and not args.quick:
-        _emit(f"A profile already exists: {target}")
-        if not _confirm("Reconfigure it?", default=False):
-            _emit("Left untouched. Use `council init --reconfigure` to overwrite.")
+        _emit(t(cat, "cli.init.profile_exists", target=target))
+        if not _confirm(t(cat, "cli.init.reconfigure_q"), default=False):
+            _emit(t(cat, "cli.init.left_untouched"))
             return 0
 
     quick = args.quick
-    _emit("Council bootstrap (Article 0) — auto-detect + confirm.")
-    _emit(f"  council_home : {cfg.council_home}")
-    _emit(f"  data_home    : {cfg.data_home}")
-    _emit(f"  os           : {_detect_os()}")
+    _emit(t(cat, "cli.init.bootstrap"))
+    _emit(t(cat, "cli.init.council_home", value=cfg.council_home))
+    _emit(t(cat, "cli.init.data_home", value=cfg.data_home))
+    _emit(t(cat, "cli.init.os", value=_detect_os()))
 
     # 1) roster auto-detect
     detected = _detect_roster(extra_path)
     found = [(n, c) for (n, c, ok) in detected if ok]
-    _emit("\nProvider CLIs on PATH:")
+    _emit(t(cat, "cli.init.clis_on_path"))
     for name, cli, ok in detected:
-        _emit(f"  {_OK if ok else _BAD} {name:<8} ({cli})")
+        _emit(t(cat, "cli.init.cli_line", mark=_OK if ok else _BAD, name=name, cli=cli))
     if len(found) < 2:
-        _emit(
-            f"\n  {_WARN} Fewer than 2 providers detected. Council runs in ADVISORY mode:\n"
-            "    cross-verification is disabled, confidence is capped at 0.6, and\n"
-            "    output is marked 'unverified'. This is a fully supported, honest default."
-        )
+        _emit(t(cat, "cli.init.few_providers", warn=_WARN))
 
     roster: list[tuple[str, str, str, bool]] = []
     for i, (name, cli, ok) in enumerate(detected):
@@ -251,20 +249,17 @@ def cmd_init(args: argparse.Namespace) -> int:
         owner, org, node_name = "operator", "", ""
         locale, regime = "en", "standard"
     else:
-        owner = _ask("Owner label (NOT your username)", "operator") or "operator"
-        org = _ask("Organization (optional)", "")
-        node_name = _ask("Node name (optional)", "")
-        locale = _ask(f"Locale {'|'.join(_LOCALES)}", "en").lower()
+        owner = _ask(t(cat, "cli.init.ask_owner"), "operator") or "operator"
+        org = _ask(t(cat, "cli.init.ask_org"), "")
+        node_name = _ask(t(cat, "cli.init.ask_node"), "")
+        locale = _ask(t(cat, "cli.init.ask_locale", choices="|".join(_LOCALES)), "en").lower()
         if locale not in _LOCALES:
             locale = "en"
-        regime = _ask(f"Data regime {'|'.join(_REGIMES)}", "standard").lower()
+        regime = _ask(t(cat, "cli.init.ask_regime", choices="|".join(_REGIMES)), "standard").lower()
         if regime not in _REGIMES:
             regime = "standard"
         if regime != "standard":
-            _emit(
-                f"  {_WARN} Regime '{regime}' only activates a detection aid (regimes/{regime}.toml).\n"
-                "    It is NOT a legal-compliance guarantee (Article 4.3); liability stays with you."
-            )
+            _emit(t(cat, "cli.init.regime_warn", warn=_WARN, regime=regime))
 
     secret_backend, scheduler, notifier = _detect_backends(extra_path)
 
@@ -291,14 +286,10 @@ def cmd_init(args: argparse.Namespace) -> int:
     for d in (new_cfg.data_home, new_cfg.logs_dir(), new_cfg.sessions_dir()):
         written.append(d)
 
-    _emit("\nWrote (every path listed; no hidden side effects):")
+    _emit(t(cat, "cli.init.wrote"))
     for p in written:
         _emit(f"  {p}")
-    _emit(
-        "\nNo background service was installed. Automation is opt-in:\n"
-        "  council enable capture   (consent + PHI/secret gate explained)\n"
-        "Next: `council doctor` proves which providers are actually reachable."
-    )
+    _emit(t(cat, "cli.init.next_steps"))
     return 0
 
 
@@ -308,19 +299,20 @@ def cmd_init(args: argparse.Namespace) -> int:
 
 
 def _doctor_clis(cfg: Config, results: list[tuple[bool, str]]) -> None:
+    cat = load_catalog(cfg)
     avail = available(cfg)
     if not cfg.agents:
-        results.append((False, "roster: no agents configured (run `council init`)"))
+        results.append((False, t(cat, "cli.doctor.roster_none")))
         return
     search = os.pathsep.join([cfg.extra_path, os.environ.get("PATH", "")])
     enabled_ok = 0
     for a in cfg.agents:
         if not a.enabled:
-            results.append((True, f"agent {a.name}: disabled (skipped)"))
+            results.append((True, t(cat, "cli.doctor.agent_disabled", name=a.name)))
             continue
         path = shutil.which(a.cli, path=search)
         if not path:
-            results.append((False, f"agent {a.name}: CLI '{a.cli}' not on PATH"))
+            results.append((False, t(cat, "cli.doctor.agent_not_on_path", name=a.name, cli=a.cli)))
             continue
         # actually try to run it (evidence, not assumption)
         ran = False
@@ -334,30 +326,24 @@ def _doctor_clis(cfg: Config, results: list[tuple[bool, str]]) -> None:
                 continue
         if ran:
             enabled_ok += 1
-            results.append((True, f"agent {a.name}: '{a.cli}' runnable ({path})"))
+            results.append((True, t(cat, "cli.doctor.agent_runnable", name=a.name, cli=a.cli, path=path)))
         else:
-            results.append((False, f"agent {a.name}: '{a.cli}' found but did not run cleanly"))
+            results.append((False, t(cat, "cli.doctor.agent_unclean", name=a.name, cli=a.cli)))
     if enabled_ok == 0:
         # Non-fatal (a fresh machine legitimately has no CLI yet) but UNMISTAKABLY a warning,
         # so "Install complete" is never read as "fully working" (fresh-install audit finding).
-        results.append((
-            True,
-            "⚠ 0 providers runnable — council CANNOT run tasks yet; install at least one CLI "
-            "(e.g. claude / codex / gemini) and re-run `council doctor`. (advisory mode)",
-        ))
+        results.append((True, t(cat, "cli.doctor.no_providers")))
     elif enabled_ok < 2:
-        results.append((
-            True,
-            f"⚠ advisory mode: only {enabled_ok} provider runnable — no cross-validation, "
-            f"confidence capped at {cfg.confidence_cap_noxval}; add a 2nd provider for full council.",
-        ))
+        results.append((True, t(cat, "cli.doctor.one_provider",
+                                 n=enabled_ok, cap=cfg.confidence_cap_noxval)))
 
 
 def _doctor_duckdb(cfg: Config, results: list[tuple[bool, str]]) -> None:
+    cat = load_catalog(cfg)
     try:
         import duckdb  # noqa: F401
     except Exception:
-        results.append((False, "duckdb: not importable (install dependencies: pip install duckdb)"))
+        results.append((False, t(cat, "cli.doctor.duckdb_not_importable")))
         return
     # INSERT / SELECT / ROLLBACK on a throwaway DB (no live data touched)
     tmp = Path(tempfile.mkdtemp(prefix="council-doctor-")) / "probe.duckdb"
@@ -372,13 +358,13 @@ def _doctor_duckdb(cfg: Config, results: list[tuple[bool, str]]) -> None:
             con.execute("ROLLBACK")
             after = con.execute("SELECT count(*) FROM t").fetchone()[0]
             if n == 1 and after == 0:
-                results.append((True, "duckdb: INSERT/SELECT/ROLLBACK verified"))
+                results.append((True, t(cat, "cli.doctor.duckdb_verified")))
             else:
-                results.append((False, f"duckdb: transaction semantics off (insert={n}, after-rollback={after})"))
+                results.append((False, t(cat, "cli.doctor.duckdb_semantics_off", n=n, after=after)))
         finally:
             con.close()
     except Exception as exc:
-        results.append((False, f"duckdb: probe failed ({exc})"))
+        results.append((False, t(cat, "cli.doctor.duckdb_probe_failed", exc=exc)))
     finally:
         try:
             shutil.rmtree(tmp.parent, ignore_errors=True)
@@ -390,6 +376,7 @@ def _doctor_append_only(cfg: Config, results: list[tuple[bool, str]]) -> None:
     """Prove the audit helper rejects mutation (Article 11). Tries the SELECT-only
     query guard; if that module is still a stub, falls back to the live DB UPDATE
     refusal at the policy layer being asserted by the helper."""
+    cat = load_catalog(cfg)
     try:
         from . import cli_helpers  # noqa: F401
     except Exception:
@@ -398,56 +385,58 @@ def _doctor_append_only(cfg: Config, results: list[tuple[bool, str]]) -> None:
     try:
         from .cli_helpers import konsey_db as kdb
     except Exception:
-        results.append((True, "audit guard: helper not wired yet (skipped; covered by tests)"))
+        results.append((True, t(cat, "cli.doctor.audit_helper_not_wired")))
         return
     guard = getattr(kdb, "is_read_only", None) or getattr(kdb, "_is_select_only", None)
     if callable(guard):
         ok_select = bool(guard("SELECT 1"))
         ok_reject = not bool(guard("UPDATE council_sessions SET status='x'"))
         if ok_select and ok_reject:
-            results.append((True, "audit guard: SELECT allowed, UPDATE/DELETE rejected (Article 11)"))
+            results.append((True, t(cat, "cli.doctor.audit_guard_ok")))
         else:
-            results.append((False, "audit guard: append-only guard not enforcing (Article 11)"))
+            results.append((False, t(cat, "cli.doctor.audit_guard_bad")))
     else:
-        results.append((True, "audit guard: query helper present (full check in test suite)"))
+        results.append((True, t(cat, "cli.doctor.audit_guard_present")))
 
 
 def _doctor_gateway(cfg: Config, results: list[tuple[bool, str]]) -> None:
     """The secret gate must catch a known token-format sample (Article 4.2)."""
+    cat = load_catalog(cfg)
     sample = "here is a leaked key sk-ant-api03-AAAAAAAAAAAAAAAAAAAAAAAA"
     placeholder = "API_KEY=your_key_here"
     try:
         from .gateway import scan_secrets
     except Exception:
-        results.append((True, "secret gate: gateway not wired yet (skipped; covered by tests)"))
+        results.append((True, t(cat, "cli.doctor.secret_gate_not_wired")))
         return
     try:
         caught = bool(scan_secrets(sample))
         clean = not bool(scan_secrets(placeholder))
         if caught and clean:
-            results.append((True, "secret gate: catches sk-ant sample, ignores placeholder (Article 4.2)"))
+            results.append((True, t(cat, "cli.doctor.secret_gate_full")))
         elif caught:
-            results.append((True, "secret gate: catches sk-ant sample (Article 4.2)"))
+            results.append((True, t(cat, "cli.doctor.secret_gate_partial")))
         else:
-            results.append((False, "secret gate: FAILED to catch a known sk-ant sample (Article 4.2)"))
+            results.append((False, t(cat, "cli.doctor.secret_gate_failed")))
     except Exception as exc:
-        results.append((False, f"secret gate: scan raised ({exc})"))
+        results.append((False, t(cat, "cli.doctor.secret_gate_raised", exc=exc)))
 
 
 def _doctor_graph(cfg: Config, results: list[tuple[bool, str]]) -> None:
     # Import build AND the runtime dep graph relies on lazily (adapters.adapter_for).
     # A masked import error here was how a broken `council run` slipped past doctor —
     # so an import failure is a CRITICAL fail, never a silent "skipped" pass.
+    cat = load_catalog(cfg)
     try:
         from .graph import build  # noqa: F401
         from .adapters import adapter_for  # graph.EXECUTE depends on this (lazy import)
     except Exception as exc:
-        results.append((False, f"graph: import FAILED — {exc}"))
+        results.append((False, t(cat, "cli.doctor.graph_import_failed", exc=exc)))
         return
     if callable(build) and callable(adapter_for):
-        results.append((True, "graph: build() + adapters.adapter_for importable"))
+        results.append((True, t(cat, "cli.doctor.graph_ok")))
     else:
-        results.append((False, "graph: build/adapter_for not callable"))
+        results.append((False, t(cat, "cli.doctor.graph_not_callable")))
 
 
 def _doctor_regime(cfg: Config, results: list[tuple[bool, str]]) -> None:
@@ -456,6 +445,7 @@ def _doctor_regime(cfg: Config, results: list[tuple[bool, str]]) -> None:
     silently yields no clinical detection — surface it as a VISIBLE ⚠ (non-fatal:
     the secret scan is always on, and an operator may legitimately not have installed
     terms yet)."""
+    cat = load_catalog(cfg)
     regime = (cfg.data_regime or "standard").strip().lower()
     try:
         from .gateway import regime_loaded
@@ -464,23 +454,20 @@ def _doctor_regime(cfg: Config, results: list[tuple[bool, str]]) -> None:
     if regime not in {"kvkk", "gdpr", "hipaa"}:
         return
     if regime_loaded(cfg):
-        results.append((True, f"regime: '{regime}' term plugin loaded (clinical/identity detection active)"))
+        results.append((True, t(cat, "cli.doctor.regime_loaded", regime=regime)))
     else:
         plugin = Path(cfg.council_home) / "regimes" / f"{regime}.toml"
-        results.append((
-            True,
-            f"⚠ data_regime='{regime}' set but NO term file loaded ({plugin}) — clinical/identity "
-            "detection is OFF (secret scan still on). Install the regime term file to activate it "
-            "(Article 4.1, non-fatal).",
-        ))
+        results.append((True, t(cat, "cli.doctor.regime_not_loaded", regime=regime, plugin=plugin)))
 
 
 def cmd_doctor(args: argparse.Namespace) -> int:
     cfg = load_config()
+    cat = load_catalog(cfg)
     results: list[tuple[bool, str]] = []
 
-    results.append((True, f"config: {cfg.config_path()} ({'present' if cfg.config_path().exists() else 'defaults'})"))
-    results.append((True, f"owner: {cfg.owner!r}  locale: {cfg.locale}  regime: {cfg.data_regime}"))
+    state = t(cat, "cli.doctor.config_present") if cfg.config_path().exists() else t(cat, "cli.doctor.config_defaults")
+    results.append((True, t(cat, "cli.doctor.config_line", path=cfg.config_path(), state=state)))
+    results.append((True, t(cat, "cli.doctor.owner_line", owner=repr(cfg.owner), locale=cfg.locale, regime=cfg.data_regime)))
 
     _doctor_clis(cfg, results)
     _doctor_duckdb(cfg, results)
@@ -489,7 +476,7 @@ def cmd_doctor(args: argparse.Namespace) -> int:
     _doctor_graph(cfg, results)
     _doctor_regime(cfg, results)
 
-    _emit("council doctor — evidence-based health check\n")
+    _emit(t(cat, "cli.doctor.header"))
     critical_fail = False
     for ok, line in results:
         if not ok:
@@ -505,9 +492,9 @@ def cmd_doctor(args: argparse.Namespace) -> int:
             _emit(f"  {_OK} {line}")
 
     if critical_fail:
-        _emit(f"\n{_BAD} Critical checks failed. See lines marked above.")
+        _emit(t(cat, "cli.doctor.critical_failed", bad=_BAD))
         return 1
-    _emit(f"\n{_OK} All checks passed.")
+    _emit(t(cat, "cli.doctor.all_passed", ok=_OK))
     return 0
 
 
@@ -518,17 +505,18 @@ def cmd_doctor(args: argparse.Namespace) -> int:
 
 def cmd_run(args: argparse.Namespace) -> int:
     cfg = load_config()
+    cat = load_catalog(cfg)
     try:
         from .graph import build
     except Exception:
-        _err("council run: the orchestration graph is not available in this build.")
+        _err(t(cat, "cli.run.graph_unavailable"))
         return 2
     if args.dry_run:
         # PREFLIGHT only: classify + secret scan, do not execute the loop.
         try:
             from .gateway import preflight
         except Exception:
-            _err("council run --dry-run: gateway not available.")
+            _err(t(cat, "cli.run.gateway_unavailable"))
             return 2
         # Pass cfg so the project risk-registry + data-regime from council.local
         # apply to dry-run classification, matching the live `run` path (KNOWN_ISSUES).
@@ -538,13 +526,13 @@ def cmd_run(args: argparse.Namespace) -> int:
 
             _emit(_json.dumps(getattr(res, "__dict__", {"risk": getattr(res, "risk", "?")}), default=str))
         else:
-            _emit(f"risk    : {getattr(res, 'risk', '?')}")
-            _emit(f"blocked : {getattr(res, 'blocked', False)}")
+            _emit(t(cat, "cli.run.risk", value=getattr(res, "risk", "?")))
+            _emit(t(cat, "cli.run.blocked", value=getattr(res, "blocked", False)))
             if getattr(res, "secrets_found", None):
-                _emit(f"secrets : {res.secrets_found}")
+                _emit(t(cat, "cli.run.secrets", value=res.secrets_found))
             if getattr(res, "notes", None):
                 for n in res.notes:
-                    _emit(f"note    : {n}")
+                    _emit(t(cat, "cli.run.note", value=n))
         return 0
 
     try:
@@ -554,10 +542,10 @@ def cmd_run(args: argparse.Namespace) -> int:
             config={"recursion_limit": 60},
         )
     except NotImplementedError:
-        _err("council run: orchestration loop not implemented in this build.")
+        _err(t(cat, "cli.run.loop_not_implemented"))
         return 2
     except Exception as exc:
-        _err(f"council run: failed ({exc})")
+        _err(t(cat, "cli.run.failed", exc=exc))
         return 1
 
     if args.json:
@@ -565,7 +553,7 @@ def cmd_run(args: argparse.Namespace) -> int:
 
         _emit(_json.dumps(final, default=str))
     else:
-        _emit("\n" + (final.get("report") if isinstance(final, dict) else str(final)) or "(no report produced)")
+        _emit("\n" + (final.get("report") if isinstance(final, dict) else str(final)) or t(cat, "report.none_produced"))
     return 0
 
 
@@ -585,35 +573,38 @@ def _accepts_cfg(fn) -> bool:
 
 def cmd_status(args: argparse.Namespace) -> int:
     cfg = load_config()
-    _emit("Council status\n")
-    _emit(f"  owner   : {cfg.owner}")
-    _emit(f"  locale  : {cfg.locale}   regime: {cfg.data_regime}")
-    _emit(f"  config  : {cfg.config_path()} ({'present' if cfg.config_path().exists() else 'defaults'})")
+    cat = load_catalog(cfg)
+    _emit(t(cat, "cli.status.header"))
+    _emit(t(cat, "cli.status.owner", value=cfg.owner))
+    _emit(t(cat, "cli.status.locale", locale=cfg.locale, regime=cfg.data_regime))
+    state = t(cat, "cli.doctor.config_present") if cfg.config_path().exists() else t(cat, "cli.doctor.config_defaults")
+    _emit(t(cat, "cli.status.config", path=cfg.config_path(), state=state))
 
     avail = available(cfg)
-    _emit("\n  roster:")
+    _emit(t(cat, "cli.status.roster"))
     if not cfg.agents:
-        _emit("    (none — run `council init`)")
+        _emit(t(cat, "cli.status.roster_none"))
     for a in cfg.agents:
         if not a.enabled:
-            _emit(f"    - {a.name:<8} {a.role:<10} disabled")
+            _emit(t(cat, "cli.status.agent_disabled", name=a.name, role=a.role))
             continue
-        _emit(f"    {_OK if avail.get(a.name) else _BAD} {a.name:<8} {a.role:<10} ({a.cli})")
+        _emit(t(cat, "cli.status.agent_line", mark=_OK if avail.get(a.name) else _BAD,
+                name=a.name, role=a.role, cli=a.cli))
     enabled_ok = sum(1 for a in cfg.agents if a.enabled and avail.get(a.name))
     if enabled_ok < 2:
-        _emit(f"\n  {_WARN} advisory mode: {enabled_ok} provider(s) reachable, confidence capped at {cfg.confidence_cap_noxval}")
+        _emit(t(cat, "cli.status.advisory", warn=_WARN, n=enabled_ok, cap=cfg.confidence_cap_noxval))
 
     db = cfg.db_path()
     if db.exists():
         size_mb = db.stat().st_size / (1024 * 1024)
-        _emit(f"\n  audit db: {db} ({size_mb:.1f} MB)")
+        _emit(t(cat, "cli.status.audit_db", db=db, size=f"{size_mb:.1f}"))
         sessions = _recent_sessions(cfg, n=5)
         if sessions:
-            _emit("  recent sessions:")
+            _emit(t(cat, "cli.status.recent_sessions"))
             for row in sessions:
                 _emit(f"    {row}")
     else:
-        _emit(f"\n  audit db: {db} (not created yet)")
+        _emit(t(cat, "cli.status.audit_db_none", db=db))
     return 0
 
 
@@ -644,15 +635,16 @@ def _recent_sessions(cfg: Config, n: int = 5) -> list[str]:
 
 def cmd_audit(args: argparse.Namespace) -> int:
     cfg = load_config()
+    cat = load_catalog(cfg)
     if args.open:
         try:
             from . import dashboard
         except Exception:
-            _err("council audit --open: dashboard module not available.")
+            _err(t(cat, "cli.audit.dashboard_unavailable"))
             return 2
         builder = getattr(dashboard, "build_html", None) or getattr(dashboard, "main", None)
         if not callable(builder):
-            _err("council audit --open: dashboard not implemented in this build.")
+            _err(t(cat, "cli.audit.dashboard_not_implemented"))
             return 2
         out = cfg.data_home / "dashboard.html"
         try:
@@ -663,7 +655,7 @@ def cmd_audit(args: argparse.Namespace) -> int:
             else:
                 builder()
         except Exception as exc:
-            _err(f"council audit --open: failed ({exc})")
+            _err(t(cat, "cli.audit.open_failed", exc=exc))
             return 1
         _emit(str(out))
         return 0
@@ -674,7 +666,7 @@ def cmd_audit(args: argparse.Namespace) -> int:
     # default: recent N
     rows = _recent_sessions(cfg, n=args.n)
     if not rows:
-        _emit("(no sessions; or duckdb/db unavailable)")
+        _emit(t(cat, "cli.audit.no_sessions"))
         return 0
     for r in rows:
         _emit(r)
@@ -682,14 +674,15 @@ def cmd_audit(args: argparse.Namespace) -> int:
 
 
 def _audit_query(cfg: Config, sql: str) -> int:
+    cat = load_catalog(cfg)
     low = sql.strip().lower()
     if not low.startswith(("select", "with", "describe", "summarize", "pragma")):
-        _err("REJECTED: append-only audit — only SELECT/WITH/DESCRIBE/SUMMARIZE/PRAGMA queries run.")
+        _err(t(cat, "cli.audit.rejected"))
         return 2
     try:
         import duckdb
     except Exception:
-        _err("council audit query: duckdb not available.")
+        _err(t(cat, "cli.audit.query_duckdb_unavailable"))
         return 2
     try:
         con = duckdb.connect(str(cfg.db_path()), read_only=True)
@@ -699,7 +692,7 @@ def _audit_query(cfg: Config, sql: str) -> int:
         finally:
             con.close()
     except Exception as exc:
-        _err(f"council audit query: failed ({exc})")
+        _err(t(cat, "cli.audit.query_failed", exc=exc))
         return 1
     return 0
 
@@ -725,6 +718,7 @@ _SCALAR_KEYS = {
 
 def cmd_config(args: argparse.Namespace) -> int:
     cfg = load_config()
+    cat = load_catalog(cfg)
     path = cfg.config_path()
 
     if args.action == "path":
@@ -735,42 +729,45 @@ def cmd_config(args: argparse.Namespace) -> int:
         if not args.key:
             # print everything we can without leaking unset values
             for k in sorted(_SCALAR_KEYS):
-                _emit(f"{k} = {getattr(cfg, k, '')!r}")
-            _emit(f"agents = {len(cfg.agents)} entr{'y' if len(cfg.agents) == 1 else 'ies'}")
-            _emit(f"projects = {len(cfg.projects)} entr{'y' if len(cfg.projects) == 1 else 'ies'}")
+                _emit(t(cat, "cli.config.scalar_line", key=k, value=repr(getattr(cfg, k, ""))))
+            _emit(t(cat, "cli.config.agents_entries", n=len(cfg.agents),
+                    word=t(cat, "cli.config.entry_singular") if len(cfg.agents) == 1
+                    else t(cat, "cli.config.entry_plural")))
+            _emit(t(cat, "cli.config.projects_entries", n=len(cfg.projects),
+                    word=t(cat, "cli.config.entry_singular") if len(cfg.projects) == 1
+                    else t(cat, "cli.config.entry_plural")))
             return 0
         if not hasattr(cfg, args.key):
-            _err(f"unknown key: {args.key}")
+            _err(t(cat, "cli.config.unknown_key", key=args.key))
             return 2
         _emit(str(getattr(cfg, args.key)))
         return 0
 
     if args.action == "set":
         if not args.key or args.value is None:
-            _err("usage: council config set <key> <value>")
+            _err(t(cat, "cli.config.set_usage"))
             return 2
         if args.key not in _SCALAR_KEYS:
-            _err(f"refusing to set '{args.key}': only scalar keys {sorted(_SCALAR_KEYS)} via `set`. "
-                 "Use `council config edit` for roster/projects.")
+            _err(t(cat, "cli.config.refuse_set", key=args.key, keys=sorted(_SCALAR_KEYS)))
             return 2
         return _config_set_scalar(path, args.key, args.value)
 
     if args.action == "edit":
         if not path.exists():
-            _emit(f"No profile yet at {path}. Run `council init` first.")
+            _emit(t(cat, "cli.config.no_profile_init", path=path))
             return 1
         editor = os.environ.get("EDITOR") or os.environ.get("VISUAL")
         if not editor:
-            _emit(f"$EDITOR not set. Edit this file manually:\n  {path}")
+            _emit(t(cat, "cli.config.editor_unset", path=path))
             return 0
         try:
             subprocess.run([editor, str(path)], check=False)
         except Exception as exc:
-            _err(f"could not launch editor: {exc}")
+            _err(t(cat, "cli.config.editor_failed", exc=exc))
             return 1
         return 0
 
-    _err("usage: council config {get|set|path|edit}")
+    _err(t(cat, "cli.config.usage"))
     return 2
 
 
@@ -778,7 +775,7 @@ def _config_set_scalar(path: Path, key: str, value: str) -> int:
     """Set/replace a top-level scalar key in council.local.toml without a TOML
     writer dependency. Only operates on the head section (before the first table)."""
     if not path.exists():
-        _err(f"No profile at {path}. Run `council init` first.")
+        _err(t(load_catalog(load_config()), "cli.config.no_profile_at", path=path))
         return 1
     text = path.read_text(encoding="utf-8")
     lines = text.splitlines()
@@ -807,7 +804,7 @@ def _config_set_scalar(path: Path, key: str, value: str) -> int:
                 break
         out.insert(insert_at, new_line)
     path.write_text("\n".join(out) + "\n", encoding="utf-8")
-    _emit(f"set {key} = {value}")
+    _emit(t(load_catalog(load_config()), "cli.config.set_ok", key=key, value=value))
     return 0
 
 
@@ -818,31 +815,37 @@ def _config_set_scalar(path: Path, key: str, value: str) -> int:
 
 def cmd_agents(args: argparse.Namespace) -> int:
     cfg = load_config()
+    cat = load_catalog(cfg)
     if args.action == "list":
         if not cfg.agents:
-            _emit("(no agents — run `council init`)")
+            _emit(t(cat, "cli.agents.none"))
             return 0
         avail = available(cfg)
         for a in cfg.agents:
-            state = "disabled" if not a.enabled else (f"{_OK} reachable" if avail.get(a.name) else f"{_BAD} missing")
-            _emit(f"{a.name:<8} {a.role:<10} cli={a.cli:<10} {state}")
+            if not a.enabled:
+                state = t(cat, "cli.agents.state_disabled")
+            elif avail.get(a.name):
+                state = t(cat, "cli.agents.state_reachable", ok=_OK)
+            else:
+                state = t(cat, "cli.agents.state_missing", bad=_BAD)
+            _emit(t(cat, "cli.agents.list_line", name=a.name, role=a.role, cli=a.cli, state=state))
         return 0
 
     if args.action == "test":
         if not cfg.agents:
-            _emit("(no agents — run `council init`)")
+            _emit(t(cat, "cli.agents.none"))
             return 1
         search = os.pathsep.join([cfg.extra_path, os.environ.get("PATH", "")])
         any_fail = False
         for a in cfg.agents:
             if not a.enabled:
-                _emit(f"  - {a.name}: disabled (skipped)")
+                _emit(t(cat, "cli.agents.test_disabled", name=a.name))
                 continue
             if args.name and a.name != args.name:
                 continue
             p = shutil.which(a.cli, path=search)
             if not p:
-                _emit(f"  {_BAD} {a.name}: '{a.cli}' not on PATH")
+                _emit(t(cat, "cli.agents.test_not_on_path", bad=_BAD, name=a.name, cli=a.cli))
                 any_fail = True
                 continue
             ok = False
@@ -854,11 +857,12 @@ def cmd_agents(args: argparse.Namespace) -> int:
                         break
                 except Exception:
                     continue
-            _emit(f"  {_OK if ok else _BAD} {a.name}: {'runnable' if ok else 'found but did not run'} ({p})")
+            state = t(cat, "cli.agents.test_runnable") if ok else t(cat, "cli.agents.test_not_run")
+            _emit(t(cat, "cli.agents.test_result", mark=_OK if ok else _BAD, name=a.name, state=state, path=p))
             any_fail = any_fail or not ok
         return 1 if any_fail else 0
 
-    _err("usage: council agents {list|test}")
+    _err(t(cat, "cli.agents.usage"))
     return 2
 
 
@@ -869,31 +873,24 @@ def cmd_agents(args: argparse.Namespace) -> int:
 
 def cmd_enable(args: argparse.Namespace) -> int:
     cfg = load_config()
+    cat = load_catalog(cfg)
     if args.what != "capture":
-        _err("usage: council enable capture")
+        _err(t(cat, "cli.enable.usage"))
         return 2
 
-    _emit(
-        "Autocapture distills past sessions into the append-only audit, unattended.\n"
-        "Before it runs, EVERY captured payload passes the PHI/secret fail-safe gate\n"
-        "(Article 4 & 13): tool I/O and base64 blobs included. Capture is OFF by default.\n"
-    )
-    if not _confirm("Enable autocapture now?", default=False):
-        _emit("Left disabled.")
+    _emit(t(cat, "cli.enable.explainer"))
+    if not _confirm(t(cat, "cli.enable.now_q"), default=False):
+        _emit(t(cat, "cli.enable.left_disabled"))
         return 0
 
     path = cfg.config_path()
     if not path.exists():
-        _err("No profile yet. Run `council init` first.")
+        _err(t(cat, "cli.enable.no_profile"))
         return 1
     rc = _config_set_bool(path, "autocapture_enabled", True)
     if rc != 0:
         return rc
-    _emit(
-        f"{_OK} autocapture_enabled = true in {path}\n"
-        "Note: this flips the consent flag only. The scheduler that ticks capture is\n"
-        "installed separately (Phase 3 platform layer); no background job was started here."
-    )
+    _emit(t(cat, "cli.enable.enabled", ok=_OK, path=path))
     return 0
 
 
@@ -930,6 +927,7 @@ def _config_set_bool(path: Path, key: str, value: bool) -> int:
 
 def cmd_stop(args: argparse.Namespace) -> int:
     cfg = load_config()
+    cat = load_catalog(cfg)
     cfg.ensure_dirs()
     # A simple, portable kill signal the loop polls (_killcheck). No process killing
     # here — the running loop owns its own teardown; this just sets the flag.
@@ -937,10 +935,10 @@ def cmd_stop(args: argparse.Namespace) -> int:
     try:
         flag.write_text("stop requested\n", encoding="utf-8")
     except Exception as exc:
-        _err(f"council stop: could not write kill flag ({exc})")
+        _err(t(cat, "cli.stop.write_failed", exc=exc))
         return 1
-    _emit(f"{_OK} kill switch set: {flag}")
-    _emit("The running loop stops at its next safe checkpoint and writes a partial-result reason to the audit.")
+    _emit(t(cat, "cli.stop.kill_flag_set", ok=_OK, flag=flag))
+    _emit(t(cat, "cli.stop.checkpoint_note"))
     return 0
 
 
@@ -951,6 +949,7 @@ def cmd_stop(args: argparse.Namespace) -> int:
 
 def cmd_uninstall(args: argparse.Namespace) -> int:
     cfg = load_config()
+    cat = load_catalog(cfg)
     removed: list[str] = []
     kept: list[str] = []
 
@@ -962,43 +961,43 @@ def cmd_uninstall(args: argparse.Namespace) -> int:
             uninstaller = getattr(sched_mod, "uninstall", None)
             if callable(uninstaller):
                 uninstaller(cfg)
-                removed.append("scheduler job (platform.scheduler.uninstall)")
+                removed.append(t(cat, "cli.uninstall.scheduler_removed"))
             else:
-                removed.append("scheduler job (no-op: NullScheduler / not installed)")
+                removed.append(t(cat, "cli.uninstall.scheduler_noop"))
         except Exception as exc:
-            kept.append(f"scheduler (could not remove: {exc})")
+            kept.append(t(cat, "cli.uninstall.scheduler_kept", exc=exc))
 
     if args.all:
         # Data removal is destructive — require explicit consent unless --keep-data.
         if args.keep_data:
-            kept.append(f"audit data preserved at {cfg.data_home}")
+            kept.append(t(cat, "cli.uninstall.data_preserved", data_home=cfg.data_home))
         else:
-            if _confirm(f"Delete ALL data under {cfg.data_home}? This is irreversible.", default=False):
+            if _confirm(t(cat, "cli.uninstall.delete_all_q", data_home=cfg.data_home), default=False):
                 try:
                     shutil.rmtree(cfg.data_home, ignore_errors=True)
-                    removed.append(f"data dir {cfg.data_home}")
+                    removed.append(t(cat, "cli.uninstall.data_removed", data_home=cfg.data_home))
                 except Exception as exc:
-                    kept.append(f"data dir (could not remove: {exc})")
+                    kept.append(t(cat, "cli.uninstall.data_kept_err", exc=exc))
             else:
-                kept.append(f"audit data kept at {cfg.data_home}")
+                kept.append(t(cat, "cli.uninstall.data_kept", data_home=cfg.data_home))
         # local profile
         path = cfg.config_path()
-        if path.exists() and _confirm(f"Remove the local profile {path}?", default=False):
+        if path.exists() and _confirm(t(cat, "cli.uninstall.remove_profile_q", path=path), default=False):
             try:
                 path.unlink()
                 removed.append(str(path))
             except Exception as exc:
-                kept.append(f"profile (could not remove: {exc})")
+                kept.append(t(cat, "cli.uninstall.profile_kept_err", exc=exc))
 
     if not args.automation and not args.all:
-        _emit("Nothing selected. Use --automation (background jobs only) or --all [--keep-data].")
+        _emit(t(cat, "cli.uninstall.nothing_selected"))
         return 0
 
-    _emit("Uninstall summary:")
+    _emit(t(cat, "cli.uninstall.summary"))
     for r in removed:
-        _emit(f"  {_OK} removed: {r}")
+        _emit(t(cat, "cli.uninstall.removed_line", ok=_OK, item=r))
     for k in kept:
-        _emit(f"  {_WARN} kept   : {k}")
+        _emit(t(cat, "cli.uninstall.kept_line", warn=_WARN, item=k))
     return 0
 
 

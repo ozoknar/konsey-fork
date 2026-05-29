@@ -13,6 +13,7 @@ import json
 import sys
 
 from .config import available, load_config
+from .i18n import load_catalog, t
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -30,6 +31,7 @@ def main(argv: list[str] | None = None) -> int:
     a = ap.parse_args(argv)
 
     cfg = load_config(a.config)
+    cat = load_catalog(cfg)
 
     if a.dry_run:
         # Evidence-first: prove what WOULD run without spending a single provider call.
@@ -78,7 +80,7 @@ def main(argv: list[str] | None = None) -> int:
         }
         print(json.dumps(payload, ensure_ascii=False, indent=2))
     else:
-        print("\n" + final.get("report", "(no report produced)"))
+        print("\n" + final.get("report", t(cat, "report.none_produced")))
 
     dec = final.get("decision", {})
     # Exit non-zero when a human must decide (blocked / killed / low confidence) so a
