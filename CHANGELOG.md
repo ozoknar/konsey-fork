@@ -12,6 +12,20 @@ unverified "it works" claims. Test evidence is cited where it backs an entry.
 
 ### Added
 
+- **Real-work execution — `council do "<task>"` (Faz 3a, opt-in, default OFF).** The
+  centerpiece's smallest safe increment: ONE sandboxed provider (claude→codex; agy
+  excluded — least-scopable) edits an **isolated git worktree** (off HEAD, under
+  `data_home`, outside the repo) to perform a task; success is proven ONLY by a fresh
+  acceptance command the harness re-runs itself (producer≠verifier — the worker's "done"
+  is not evidence; `--accept` is REQUIRED, no-accept ⇒ tri-state UNVERIFIED, never a
+  pass); the verified branch is kept for the human to review/merge/PR ONLY on explicit
+  approval — konsey NEVER auto-merges (esp. not to master). Three independent OFF locks:
+  `exec_sandbox != "off"` + `KONSEY_EXEC=1`/`--force` + a TTY confirm. New `council/execute.py`
+  (`do_work`→`WorkResult`) + `council/worktree.py` (injected `GitRunner`), both thin over
+  the Faz 2 `repair.py` primitive (same profiles/env-allow-list/scrub/gate/runner). Also
+  `council doctor --json` (from Faz 2). 16 new tests with injected git+worker+acceptance
+  (no live agent). NOT wired into the always-on `council run` graph (that's 3c). Fan-out
+  across providers + winner-select is 3b.
 - **AI-assisted install repair — the first tool-ON execution primitive (Faz 2, opt-in).**
   `council doctor --json` emits a structured, locale-independent report (`{schema, ok, rc,
   critical, advisory, checks[]}`) from a single source of truth (`_doctor_collect`); the

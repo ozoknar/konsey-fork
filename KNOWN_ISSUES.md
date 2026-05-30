@@ -7,6 +7,18 @@
 
 ## EN
 
+- **`council do` (Faz 3a) — single-provider, council_home-only, headless-edit caveat.** The
+  real-work executor is the smallest safe slice: ONE provider, NO fan-out (3b), NOT wired
+  into the always-on `council run` graph (3c), and it runs ONLY against `cfg.council_home`
+  (arbitrary `--repo` is deferred — widens the production-write surface). Containment carries
+  repair.py's honest limit: `worktree.changed_files` only sees IN-worktree git changes, so a
+  worker writing outside the worktree is NOT in the WorkResult — the provider sandbox +
+  cwd-pin are the real containment, `gate_paths` is defense-in-depth. Observed in the Faz 2
+  smoke: a headless `claude -p --permission-mode acceptEdits` may NOT actually apply a file
+  edit, so a verified pass is required before anything is kept and an UNVERIFIED result is
+  simply discarded — efficacy (does the agent reliably do the task) is a separate tuning
+  matter from the (proven) safety/containment. Merge is NEVER automatic: a verified result
+  is left on `konsey/do/<sid>/<provider>` for you to review and merge/PR.
 - **AI repair (`doctor --fix`) — path-scope is detection, not prevention.** The repair
   worker runs tool-ON (claude acceptEdits / codex workspace-write / agy
   `--dangerously-skip-permissions`) cwd-pinned to the repo; providers cannot finely scope

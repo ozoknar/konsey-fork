@@ -41,7 +41,7 @@ from .config import (
     load_config,
 )
 from .i18n import load_catalog, t
-from . import repair
+from . import execute, repair, worktree
 
 # ---------------------------------------------------------------------------
 # tiny terminal helpers (no color dependency; degrade to plain text)
@@ -635,6 +635,79 @@ def cmd_doctor(args: argparse.Namespace) -> int:
     return rc
 
 
+def cmd_do(args: argparse.Namespace) -> int:
+    """Faz 3a: opt-in real work — one sandboxed provider edits an isolated git worktree to
+    do a task; success is proven ONLY by a fresh acceptance command (producer≠verifier);
+    the verified branch is kept for review/PR ONLY on human approval. Default OFF (three
+    independent locks: exec_sandbox + opt-in key + TTY confirm). NEVER merges to master."""
+    cfg = load_config()
+    cat = load_catalog(cfg)
+    task = args.task
+
+    # Lock 1 — master gate: real work is OFF unless the operator enabled exec_sandbox.
+    if cfg.exec_sandbox == "off":
+        _err(t(cat, "cli.do.sandbox_off"))
+        return 2
+    # An acceptance command is REQUIRED — never silently treat "no check" as success.
+    if not getattr(args, "accept", None):
+        _err(t(cat, "cli.do.need_accept"))
+        return 2
+    # Risk gate — production/phi real work needs a human, not an autonomous worker (Md.4/5).
+    try:
+        from .gateway import preflight
+        risk = str(getattr(preflight(task, "", cfg=cfg), "risk", "internal"))
+    except Exception:
+        _err(t(cat, "cli.do.risk_unknown"))   # fail-CLOSED: cannot classify → refuse, never downgrade
+        return 2
+    if risk in ("production", "phi"):
+        _err(t(cat, "cli.do.risk_blocked", risk=risk))
+        return 2
+    # Lock 2 — two-key opt-in (default OFF; a piped/CI run never auto-spawns a worker).
+    if os.environ.get("KONSEY_EXEC") != "1" and not args.force:
+        _err(t(cat, "cli.do.opt_out_hint"))
+        return 2
+    repo = str(cfg.council_home)
+    if not args.force and worktree.is_dirty(repo):
+        _err(t(cat, "cli.do.git_dirty"))
+        return 1
+    # Lock 3 — explicit confirm (False on a non-TTY → CI-safe).
+    if not args.force and not _confirm(t(cat, "cli.do.confirm_prompt", task=task[:80]), default=False):
+        _err(t(cat, "cli.do.declined"))
+        return 1
+
+    _emit(t(cat, "cli.do.running", provider=args.provider or "auto"))
+    spec = execute.WorkSpec(task=task, repo_root=repo, acceptance_cmd=args.accept, risk=risk, provider=args.provider)
+    result = execute.do_work(cfg, spec)
+
+    if result.refused:
+        _err(t(cat, "cli.do.refused", reason=result.refused_reason or ""))
+        return 2
+    _emit(t(cat, "cli.do.summary", provider=result.provider, files=len(result.changed_files), tests=result.tests_pass))
+    if result.diff:
+        _emit(result.diff[:4000])
+
+    if result.tests_pass and result.plan is not None:
+        # KEEP is a SEPARATE explicit decision (--keep, or an interactive confirm) — NOT
+        # implied by --force (which only opts in to RUNNING the worker). NEVER auto-merge.
+        keep = getattr(args, "keep", False) or _confirm(t(cat, "cli.do.keep_prompt"), default=False)
+        if keep:
+            if not worktree.commit_all(result.plan, f"konsey do: {task[:72]}"):
+                worktree.teardown(repo, result.plan, keep_branch=False)
+                _err(t(cat, "cli.do.commit_failed"))
+                return 2
+            worktree.teardown(repo, result.plan, keep_branch=True)
+            _emit(t(cat, "cli.do.kept", branch=result.plan.branch))
+            return 0
+        worktree.teardown(repo, result.plan, keep_branch=False)
+        _emit(t(cat, "cli.do.discarded"))
+        return 0
+
+    if result.plan is not None:
+        worktree.teardown(repo, result.plan, keep_branch=False)
+    _err(t(cat, "cli.do.not_verified"))
+    return 2
+
+
 # ---------------------------------------------------------------------------
 # run — headless 9-state loop
 # ---------------------------------------------------------------------------
@@ -1178,6 +1251,15 @@ def build_parser() -> argparse.ArgumentParser:
     sp.add_argument("--force", action="store_true",
                     help="with --fix: skip the confirm + dirty-git guard (scripted/CI repair)")
     sp.set_defaults(func=cmd_doctor)
+
+    sp = sub.add_parser("do", help="opt-in: do a real task via a sandboxed AI worker in an isolated git worktree (Faz 3a)")
+    sp.add_argument("task", help="the task to perform (treated as data, not trusted instructions)")
+    sp.add_argument("--accept", default=None,
+                    help="acceptance command that PROVES success, e.g. 'pytest -q' (REQUIRED — producer≠verifier)")
+    sp.add_argument("--provider", default=None, help="force a worker provider (claude|codex); default = auto")
+    sp.add_argument("--force", action="store_true", help="opt in to RUNNING the worker non-interactively (skips the opt-in key + confirm + dirty-git guard); does NOT keep the result")
+    sp.add_argument("--keep", action="store_true", help="non-interactively KEEP a verified result on its branch (else you're asked / it is discarded)")
+    sp.set_defaults(func=cmd_do)
 
     sp = sub.add_parser("run", help="headless 9-state loop")
     sp.add_argument("task", help="task description")
