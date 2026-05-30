@@ -7,6 +7,16 @@
 
 ## EN
 
+- **Installer UX (S3) — no live end-to-end clean-install CI job yet.** The UX kit +
+  crash-resistance traps are proven by `KONSEY_UI_SELFTEST` (capability matrix + failure
+  box), `sh -n`/`dash -n`, a `shellcheck -s sh` CI job, and a manual real non-TTY
+  `./install.sh --no-init` (exit 0 with the summary box). What is NOT yet automated: a
+  Docker clean-box install (Debian slim + python3.12, non-TTY) and a **pseudo-TTY** run
+  (`script -qec`) that would exercise the live spinner/animation path end-to-end and prove
+  "always completes" on a pristine machine. The spinner/`\r` animation itself is therefore
+  only manually verified on a TTY; the non-TTY/plain path is unit-tested. Sub-second
+  `sleep 0.1` is probed once and falls back to `sleep 1` where unsupported (coarser
+  animation, never a failure).
 - **De-domestication — starter packs/locales are EXEMPLARS, and the brand is still split.**
   The regime mechanism is fully open (any `regimes/<name>.toml` activates), but the 7 shipped
   packs carry ILLUSTRATIVE terms + national-ID regexes and an explicit "detection aid, NOT a

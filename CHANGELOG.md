@@ -12,6 +12,28 @@ unverified "it works" claims. Test evidence is cited where it backs an entry.
 
 ### Added
 
+- **Installer UX + crash-resistance (S3) — engaging, degrades cleanly, always
+  completes or fails honestly.** `install.sh` gains a one-shot capability layer
+  (`UI_COLOR/UI_UNICODE/UI_TTY/UI_WIDTH`, honoring `NO_COLOR` veto /
+  `FORCE_COLOR`/`CLICOLOR_FORCE` / a `KONSEY_NO_UI` escape hatch) and a small UX
+  kit — numbered `[n/N]` step headers, a TTY-only spinner for the slow `pip`
+  steps (the wrapped command's real output is CAPTURED and surfaced on failure,
+  never hidden), success/warn/error glyphs with ASCII fallback, and a bordered
+  summary box. All of it is strictly ADDITIVE: on a pipe / CI / `NO_COLOR` /
+  dumb terminal it degrades to plain ASCII identical in spirit to before. The
+  core is a POSIX **EXIT + INT/TERM trap** (NOT the bash-only `set -o pipefail`
+  / `trap ERR`) that captures `$?` first, prints a stage-named "safe to re-run"
+  failure panel on ANY non-zero exit or Ctrl-C, and does SCOPED, idempotent
+  cleanup — it removes only a venv it was mid-creating THIS run, never a reused
+  one, and never narrates on success. A `KONSEY_UI_SELFTEST` hook drives the kit
+  without installing, so CI can prove the capability matrix + the failure box.
+  New CI `shellcheck -s sh` job guards the POSIX dialect; 9 new tests (capability
+  degradation, NO_COLOR-vetoes-FORCE_COLOR, the failure trap, stderr-only
+  summary, dash parse, no-bash-isms). Verified: `sh -n`/`dash -n` clean,
+  shellcheck clean, a real non-TTY `./install.sh --no-init` completed exit 0 with
+  the new summary box. (Follow-up: a Docker clean-install + pseudo-TTY E2E job —
+  see KNOWN_ISSUES.)
+
 - **Naming flip (S0) — `konsey` is now CANONICAL, `council` a deprecated alias.**
   The command, brand, docs, and install output lead with `konsey`; `_prog_name()`
   now falls back to `konsey` for `python -m`/test invocations. `council` keeps
