@@ -1,0 +1,8 @@
+{
+  "_meta": "Catalogue français (partiel). Les clés manquantes reviennent à l'anglais par clé (council/i18n.py). Les jetons de contrat (VERDICT: PASS/FAIL, {ok}, etc.) restent littéraux.",
+  "cli.doctor.header": "council doctor — vérification de santé fondée sur les preuves\n",
+  "cli.doctor.all_passed": "\n{ok} Toutes les vérifications ont réussi.",
+  "cli.doctor.all_passed_advisory": "\n{ok} Toutes les vérifications ont réussi — mode consultatif (aucun CLI de fournisseur ; installez-en un pour exécuter des tâches).",
+  "cli.init.bootstrap": "Amorçage de Council (Article 0) — détection automatique + confirmation.",
+  "cli.init.ask_owner": "Libellé du propriétaire (PAS votre nom d'utilisateur)"
+}

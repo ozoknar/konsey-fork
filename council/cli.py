@@ -104,8 +104,26 @@ _CANDIDATE_CLIS: list[tuple[str, str]] = [
 ]
 _DEFAULT_ROLES = [ROLE_LEAD, ROLE_CRITIC, ROLE_VERIFIER]
 
-_REGIMES = ("standard", "kvkk", "gdpr", "hipaa")
-_LOCALES = ("en", "tr")
+def _discover_locales() -> list[str]:
+    """Locale tags that ship a bundled catalog (any council/locales/<tag>.json) — 'en'
+    always included. De-domestication: the locale set is DISCOVERED, not a hardcoded
+    (en, tr) tuple, so dropping in es.json / ar.json makes it selectable with no code edit."""
+    from .i18n import _BUNDLED_LOCALES_DIR
+    tags = {p.stem for p in _BUNDLED_LOCALES_DIR.glob("*.json")}
+    tags.add("en")
+    return sorted(tags)
+
+
+def _discover_regimes(cfg: Config) -> list[str]:
+    """'standard' plus any regimes/<name>.toml pack discovered under council_home — the
+    regime set is DISCOVERED, not a hardcoded {kvkk,gdpr,hipaa} list (any jurisdiction)."""
+    out = {"standard"}
+    try:
+        for p in (Path(cfg.council_home) / "regimes").glob("*.toml"):
+            out.add(p.stem.lower())
+    except Exception:
+        pass
+    return sorted(out)
 
 
 def _detect_os() -> str:
@@ -116,23 +134,33 @@ def _detect_os() -> str:
 
 
 def _detect_locale() -> str | None:
-    """Best-effort OS locale → a supported catalog locale (Article 17).
+    """Negotiate a UI locale against the catalogs that actually ship (Article 17).
 
-    A ``KONSEY_LOCALE`` env var (set by the installer / scriptable piped runs) takes
-    precedence over the OS locale. Otherwise honours true POSIX precedence: the FIRST
-    *set* variable in LC_ALL > LC_MESSAGES > LANG decides (a higher-priority non-Turkish
-    value wins over a lower-priority ``tr``). A ``tr*`` value (e.g. ``tr_TR.UTF-8``)
-    selects Turkish, any other set value selects English. Returns ``None`` when NOTHING
-    is set, so the caller can fall back to the stored profile / default. No side effects."""
-    forced = os.environ.get("KONSEY_LOCALE", "").strip().lower()
-    if forced[:2] == "tr":
-        return "tr"
+    BCP-47-ish negotiation (de-domestication — honours ANY shipped locale, not just
+    en/tr): candidates are tried in order — ``KONSEY_LOCALE`` (explicit), then
+    ``$LANGUAGE`` (gettext colon-list), then ``LC_ALL`` > ``LC_MESSAGES`` > ``LANG``. Each
+    candidate is reduced to its catalog (``es_MX.UTF-8`` → ``es-mx`` → ``es``), and the
+    FIRST candidate with a discovered catalog wins. Returns ``None`` when nothing matches,
+    so the caller falls back to the stored profile / default. No side effects."""
+    avail = set(_discover_locales())
+    candidates: list[str] = []
+    forced = os.environ.get("KONSEY_LOCALE", "").strip()
     if forced:
-        return "en"
-    for var in ("LC_ALL", "LC_MESSAGES", "LANG"):
-        val = os.environ.get(var, "")
-        if val:                                # first set variable wins (POSIX)
-            return "tr" if val[:2].lower() == "tr" else "en"
+        candidates.append(forced)
+    for part in os.environ.get("LANGUAGE", "").split(":"):   # gettext-style ordered list
+        if part.strip():
+            candidates.append(part.strip())
+    for var in ("LC_ALL", "LC_MESSAGES", "LANG"):            # POSIX precedence
+        val = os.environ.get(var, "").strip()
+        if val:
+            candidates.append(val)
+    for cand in candidates:
+        tag = cand.split(".")[0].split("@")[0].replace("_", "-").lower()  # es_MX.UTF-8 → es-mx
+        parts = [p for p in tag.split("-") if p]
+        for i in range(len(parts), 0, -1):                  # es-mx → es-mx, then es
+            sub = "-".join(parts[:i])
+            if sub in avail:
+                return sub
     return None
 
 
@@ -260,7 +288,7 @@ def cmd_init(args: argparse.Namespace) -> int:
     # flow in the chosen language (fixes "asked for Turkish, got English": locale used to
     # be written to TOML but never re-bound for the running session).
     initial_locale = (getattr(args, "locale", None) or _detect_locale() or cfg.locale or "en").lower()
-    if initial_locale not in _LOCALES:
+    if initial_locale not in _discover_locales():
         initial_locale = "en"
     cat = load_catalog(replace(cfg, locale=initial_locale))
 
@@ -280,8 +308,8 @@ def cmd_init(args: argparse.Namespace) -> int:
     if quick:
         locale = initial_locale
     else:
-        locale = _ask(t(cat, "cli.init.ask_locale", choices="|".join(_LOCALES)), initial_locale).lower()
-        if locale not in _LOCALES:
+        locale = _ask(t(cat, "cli.init.ask_locale", choices="|".join(_discover_locales())), initial_locale).lower()
+        if locale not in _discover_locales():
             locale = initial_locale
         cat = load_catalog(replace(cfg, locale=locale))   # re-bind: rest of init in chosen language
 
@@ -311,9 +339,9 @@ def cmd_init(args: argparse.Namespace) -> int:
         owner = _ask(t(cat, "cli.init.ask_owner"), "operator") or "operator"
         org = _ask(t(cat, "cli.init.ask_org"), "")
         node_name = _ask(t(cat, "cli.init.ask_node"), "")
-        regime = _ask(t(cat, "cli.init.ask_regime", choices="|".join(_REGIMES)), "standard").lower()
-        if regime not in _REGIMES:
-            regime = "standard"
+        regime = _ask(t(cat, "cli.init.ask_regime", choices="|".join(_discover_regimes(cfg))), "standard").lower()
+        if not regime:
+            regime = "standard"   # accept ANY regime name (a pack may be added later); doctor warns if no pack
         if regime != "standard":
             _emit(t(cat, "cli.init.regime_warn", warn=_WARN, regime=regime))
 
@@ -526,7 +554,7 @@ def _doctor_regime(cfg: Config, results: list[tuple[bool, str]]) -> None:
         from .gateway import regime_loaded
     except Exception:
         return
-    if regime not in {"kvkk", "gdpr", "hipaa"}:
+    if regime == "standard":   # any non-standard regime (gdpr/kvkk/lgpd/ccpa/…) gets health-checked
         return
     if regime_loaded(cfg):
         results.append((True, t(cat, "cli.doctor.regime_loaded", regime=regime)))
@@ -1240,8 +1268,8 @@ def build_parser() -> argparse.ArgumentParser:
     sp = sub.add_parser("init", help="bootstrap wizard (auto-detect + write council.local.toml)")
     sp.add_argument("--quick", action="store_true", help="zero questions; safe defaults")
     sp.add_argument("--reconfigure", action="store_true", help="overwrite an existing profile")
-    sp.add_argument("--locale", choices=_LOCALES, default=None,
-                    help="force interface language (else: $LANG/$LC_ALL tr* → tr, otherwise en)")
+    sp.add_argument("--locale", default=None,
+                    help="force interface language (any tag; unknown → falls back to en; else negotiated from $LANGUAGE/$LC_ALL/$LANG)")
     sp.set_defaults(func=cmd_init)
 
     sp = sub.add_parser("doctor", help="evidence-based health check")

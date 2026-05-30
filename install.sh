@@ -1,7 +1,7 @@
 #!/usr/bin/env sh
 # Council installer — POSIX, idempotent, sudo-free (Constitution Article 0 & 19.4).
 #
-#   ./install.sh [--quick] [--no-init] [--locale en|tr] [--prefix DIR] [--python PY]
+#   ./install.sh [--quick] [--no-init] [--locale LANG] [--prefix DIR] [--python PY]
 #
 # What it does (download–inspect–run friendly: read it before piping):
 #   1. Preflight: OS + toolchain (git / Xcode CLT on macOS) + Python (>=3.12 required;
@@ -42,8 +42,7 @@ while [ $# -gt 0 ]; do
     case "$1" in
         --quick)     INIT_FLAGS="$INIT_FLAGS --quick" ;;
         --no-init)   DO_INIT=0 ;;
-        --locale)    need_val "$#" "$1"; shift
-                     case "$1" in en|tr) LOCALE="$1" ;; *) die "--locale must be 'en' or 'tr' (got '$1')" ;; esac ;;
+        --locale)    need_val "$#" "$1"; shift; LOCALE="$1" ;;
         --prefix)    need_val "$#" "$1"; shift; VENV_DIR="$1" ;;
         --python)    need_val "$#" "$1"; shift; PYTHON_BIN="$1" ;;
         -h|--help)   usage 0 ;;
@@ -52,9 +51,11 @@ while [ $# -gt 0 ]; do
     shift
 done
 
-# Validate the locale up front so it can never word-split / inject into the init flags.
+# Validate the locale is a sane TAG (en, tr, es, ar, pt-BR, …) so it can never
+# word-split / inject into the init flags. The wizard negotiates it against the shipped
+# catalogs and falls back to en for an unknown tag — any jurisdiction/language welcome.
 if [ -n "$LOCALE" ]; then
-    case "$LOCALE" in en|tr) ;; *) die "--locale must be 'en' or 'tr' (got '$LOCALE')" ;; esac
+    case "$LOCALE" in *[!A-Za-z0-9_-]*) die "invalid --locale '$LOCALE' (letters/digits/-/_ only)" ;; esac
 fi
 
 # --- 1. OS detection (evidence, not assumption) -------------------------------

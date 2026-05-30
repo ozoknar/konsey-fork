@@ -46,10 +46,11 @@ Repository = "https://github.com/OWNER/konsey"
 [tool.hatch.build.targets.wheel]
 packages = ["council"]
 
+# Only paths OUTSIDE the `council` package need force-include; files under
+# `council/` (locales/*.json, db/schema.sql) are already shipped by packages=["council"]
+# above — listing them again duplicated every locale in the wheel (Codex finding #4).
 [tool.hatch.build.targets.wheel.force-include]
-"council/locales/en.json" = "council/locales/en.json"
-"council/locales/tr.json" = "council/locales/tr.json"
-"council/db/schema.sql" = "council/db/schema.sql"
+"regimes" = "regimes"                   # starter regulatory-regime packs (gdpr/hipaa/kvkk/lgpd/ccpa/pipl/pdpa)
 
 [tool.ruff]
 target-version = "py312"

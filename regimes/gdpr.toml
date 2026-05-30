@@ -1,0 +1,9 @@
+# DETECTION AID, NOT a compliance guarantee (Article 4.3). Liability is the operator's.
+# Illustrative starter terms/regexes — replace/extend with your jurisdiction's authoritative lists.
+# Clinical/identity lists live ONLY here (a regime pack), never in core/audit/capture code.
+regime = "gdpr"
+# EU GDPR special-category (Art. 9) data markers.
+terms = ["health record", "biometric data", "genetic data", "racial origin", "ethnic origin", "religious belief", "trade union", "sexual orientation", "criminal record"]
+[[identifiers]]
+name = "iban"
+pattern = "\\b[A-Z]{2}[0-9]{2}[A-Z0-9]{11,30}\\b"

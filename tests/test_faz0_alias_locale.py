@@ -50,7 +50,7 @@ def test_prog_name_reflects_invoked_command(monkeypatch):
 # --------------------------------------------------------------------------- #
 
 def _clear_locale_env(monkeypatch):
-    for v in ("LC_ALL", "LC_MESSAGES", "LANG", "KONSEY_LOCALE"):
+    for v in ("LC_ALL", "LC_MESSAGES", "LANG", "LANGUAGE", "KONSEY_LOCALE"):
         monkeypatch.delenv(v, raising=False)
 
 

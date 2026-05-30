@@ -1,0 +1,9 @@
+# DETECTION AID, NOT a compliance guarantee (Article 4.3). Liability is the operator's.
+# Illustrative starter terms/regexes — replace/extend with your jurisdiction's authoritative lists.
+# Clinical/identity lists live ONLY here (a regime pack), never in core/audit/capture code.
+regime = "pdpa"
+# Singapore PDPA personal-data markers.
+terms = ["medical record", "health condition", "biometric", "financial information"]
+[[identifiers]]
+name = "sg_nric"
+pattern = "\\b[STFGstfg][0-9]{7}[A-Za-z]\\b"

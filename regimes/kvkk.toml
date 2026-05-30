@@ -1,0 +1,9 @@
+# DETECTION AID, NOT a compliance guarantee (Article 4.3). Liability is the operator's.
+# Illustrative starter terms/regexes — replace/extend with your jurisdiction's authoritative lists.
+# Clinical/identity lists live ONLY here (a regime pack), never in core/audit/capture code.
+regime = "kvkk"
+# Turkey KVKK personal/health data markers.
+terms = ["saglik verisi", "hasta", "tani", "tibbi rapor", "kan grubu", "biyometrik"]
+[[identifiers]]
+name = "tckn"
+pattern = "\\b[1-9][0-9]{10}\\b"

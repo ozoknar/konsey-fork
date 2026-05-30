@@ -1,0 +1,8 @@
+{
+  "_meta": "Catálogo español (parcial). Las claves ausentes recurren al inglés por clave (council/i18n.py). Los tokens de contrato (VERDICT: PASS/FAIL, {ok}, etc.) permanecen literales.",
+  "cli.doctor.header": "council doctor — comprobación de salud basada en evidencia\n",
+  "cli.doctor.all_passed": "\n{ok} Todas las comprobaciones pasaron.",
+  "cli.doctor.all_passed_advisory": "\n{ok} Todas las comprobaciones pasaron — modo asesor (aún no hay CLI de proveedor; instala uno para ejecutar tareas).",
+  "cli.init.bootstrap": "Arranque de Council (Artículo 0) — autodetección + confirmar.",
+  "cli.init.ask_owner": "Etiqueta del propietario (NO tu nombre de usuario)"
+}

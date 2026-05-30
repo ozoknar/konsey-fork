@@ -1,0 +1,9 @@
+{
+  "_meta": "كتالوج عربي (جزئي). المفاتيح الناقصة تعود إلى الإنجليزية لكل مفتاح (council/i18n.py). رموز العقد (VERDICT: PASS/FAIL و {ok} وغيرها) تبقى حرفية.",
+  "_meta_dir": "rtl",
+  "cli.doctor.header": "council doctor — فحص صحة قائم على الأدلة\n",
+  "cli.doctor.all_passed": "\n{ok} اجتازت جميع الفحوصات.",
+  "cli.doctor.all_passed_advisory": "\n{ok} اجتازت جميع الفحوصات — وضع استشاري (لا توجد بعد واجهة مزوّد؛ ثبّت واحدة لتشغيل المهام).",
+  "cli.init.bootstrap": "تهيئة Council (المادة 0) — كشف تلقائي + تأكيد.",
+  "cli.init.ask_owner": "تسمية المالك (ليست اسم المستخدم)"
+}

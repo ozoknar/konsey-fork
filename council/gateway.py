@@ -83,8 +83,12 @@ _RISK_RANK = {r: i for i, r in enumerate(_RISK_ORDER)}
 # Registry "phi" is treated as "sensitive" for ranking/budgeting.
 _RISK_RANK["phi"] = _RISK_RANK["sensitive"]
 
-# Regulatory regimes that activate clinical/identity term plugins (Article 4.3).
-_REGULATED_REGIMES = {"kvkk", "gdpr", "hipaa"}
+# A regime is "regulated" (activates clinical/identity term plugins, Article 4.3) iff it
+# is not the "standard" baseline — its terms/regexes then come from a regimes/<name>.toml
+# pack DISCOVERED on disk, never from a hardcoded jurisdiction list. De-domestication:
+# any jurisdiction (gdpr/hipaa/kvkk/lgpd/ccpa/pipl/pdpa/…) drops in as data, no core edit.
+def _is_regulated(regime: str | None) -> bool:
+    return bool(regime) and (regime or "").strip().lower() != "standard"
 
 
 @dataclass
@@ -120,7 +124,11 @@ def _load_regime_terms(cfg: Config) -> tuple[list[str], list[re.Pattern[str]]]:
     the ``standard`` regime or when no plugin file is present. These lists are NEVER
     embedded in core — single source is the plugin file (Article 4.3, no double-source)."""
     regime = (cfg.data_regime or "standard").strip().lower()
-    if regime not in _REGULATED_REGIMES:
+    if not _is_regulated(regime):
+        return [], []
+    # The regime name is used as a path segment — require a safe slug so a config value
+    # like "../outside" can never escape regimes/ (Codex de-domestication finding).
+    if not re.fullmatch(r"[a-z0-9][a-z0-9_-]*", regime):
         return [], []
     plugin = Path(cfg.council_home) / "regimes" / f"{regime}.toml"
     if not plugin.exists():
@@ -159,7 +167,7 @@ def regime_loaded(cfg: Config) -> bool:
     without a term file is never mistaken for active clinical detection. The secret
     scan is always on regardless; this only concerns the regime term plugin."""
     regime = (cfg.data_regime or "standard").strip().lower()
-    if regime not in _REGULATED_REGIMES:
+    if not _is_regulated(regime):
         return False
     terms, patterns = _load_regime_terms(cfg)
     return bool(terms or patterns)
@@ -240,7 +248,7 @@ def preflight(task: str, project_hint: str = "", cfg: Config | None = None) -> G
 
     if risk in ("sensitive", "production"):
         res.notes.append(t(cat, "gateway.note_human_approval"))
-    if cfg.data_regime and cfg.data_regime.strip().lower() in _REGULATED_REGIMES:
+    if _is_regulated(cfg.data_regime):
         res.notes.append(t(cat, "gateway.note_regime", regime=cfg.data_regime))
 
     return res

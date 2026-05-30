@@ -1,0 +1,8 @@
+{
+  "_meta": "Deutscher Katalog (teilweise). Fehlende Schlüssel fallen pro Schlüssel auf Englisch zurück (council/i18n.py). Vertrags-Tokens (VERDICT: PASS/FAIL, {ok}, usw.) bleiben wörtlich.",
+  "cli.doctor.header": "council doctor — evidenzbasierte Zustandsprüfung\n",
+  "cli.doctor.all_passed": "\n{ok} Alle Prüfungen bestanden.",
+  "cli.doctor.all_passed_advisory": "\n{ok} Alle Prüfungen bestanden — Beratungsmodus (noch keine Anbieter-CLI; installieren Sie eine, um Aufgaben auszuführen).",
+  "cli.init.bootstrap": "Council-Bootstrap (Artikel 0) — automatische Erkennung + Bestätigung.",
+  "cli.init.ask_owner": "Eigentümer-Bezeichnung (NICHT Ihr Benutzername)"
+}

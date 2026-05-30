@@ -7,6 +7,17 @@
 
 ## EN
 
+- **De-domestication — starter packs/locales are EXEMPLARS, and the brand is still split.**
+  The regime mechanism is fully open (any `regimes/<name>.toml` activates), but the 7 shipped
+  packs carry ILLUSTRATIVE terms + national-ID regexes and an explicit "detection aid, NOT a
+  compliance guarantee" disclaimer — operators must replace them with their jurisdiction's
+  authoritative lists; konsey never implies legal coverage. The 4 starter locales (es/fr/de/ar)
+  are PARTIAL (a curated subset; the rest falls back to English per-key) — full translations +
+  more languages come via the same drop-in mechanism (a `CONTRIBUTING-i18n.md`/scaffold + an
+  entry_points plugin tier are follow-ups). RTL (ar) is "catalog-supported, terminal rendering
+  best-effort" — no full UAX#9 BiDi promise. The single-name brand flip (`konsey` canonical,
+  `council` deprecated alias) + PyPI/Homebrew distribution + the installer TUI + richer
+  onboarding presets are the next stages of the world-class re-evaluation, not done here.
 - **`council do` (Faz 3a) — single-provider, council_home-only, headless-edit caveat.** The
   real-work executor is the smallest safe slice: ONE provider, NO fan-out (3b), NOT wired
   into the always-on `council run` graph (3c), and it runs ONLY against `cfg.council_home`

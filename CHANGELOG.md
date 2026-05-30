@@ -12,6 +12,18 @@ unverified "it works" claims. Test evidence is cited where it backs an entry.
 
 ### Added
 
+- **De-domestication — regimes + locales are now DISCOVERED, not hardcoded to TR/EU/US.**
+  The core was region-neutral by design but strangled by allowlists: `gateway._REGULATED_REGIMES
+  = {kvkk,gdpr,hipaa}` (gated the generic pack loader at 3 sites), `cli._REGIMES`/`_LOCALES`
+  tuples, and a binary `tr`-or-`en` detector. Now: a regime is "regulated" iff a
+  `regimes/<name>.toml` pack exists (any jurisdiction drops in as data — no core edit);
+  locales are discovered from `council/locales/*.json`; `_detect_locale` does BCP-47-ish
+  negotiation (`KONSEY_LOCALE` > `$LANGUAGE` list > `LC_ALL`/`LC_MESSAGES`/`LANG`, reduced
+  `es_MX→es`, first shipped catalog wins). Ships **7 starter regime packs** (gdpr, hipaa,
+  kvkk, lgpd, ccpa, pipl, pdpa — each a "detection aid, NOT a compliance guarantee" with a
+  national-ID regex) and **4 starter locales** (es, fr, de + ar as an RTL exemplar; partial,
+  safe via per-key English fallback). `install.sh --locale` accepts any tag. 10 new tests;
+  en/tr parity preserved. (Naming flip to `konsey`-canonical is a separate follow-up.)
 - **Real-work execution — `council do "<task>"` (Faz 3a, opt-in, default OFF).** The
   centerpiece's smallest safe increment: ONE sandboxed provider (claude→codex; agy
   excluded — least-scopable) edits an **isolated git worktree** (off HEAD, under
