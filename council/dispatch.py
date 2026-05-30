@@ -275,6 +275,16 @@ def tick(cfg: Config | None = None) -> None:
         lockf = None   # non-POSIX (Windows) — the OS scheduler should not overlap ticks anyway
 
     try:
+        # Resilience watchdog FIRST (Art. 12): reap dead/stalled sessions + re-queue
+        # retriable work, so anything it re-queues is picked up by process_inbox in THIS
+        # same pass. Best-effort — a watchdog error never blocks the rest of the tick.
+        try:
+            from .watchdog import run_watchdog
+            wd = run_watchdog(cfg).summary()
+        except Exception as e:
+            wd = f"err:{e}"
+        if wd and "reaped=0 requeued=0 flagged=0" not in wd:
+            print(t(cat, "dispatch.tick_watchdog", ts=f"{datetime.now():%Y-%m-%d %H:%M}", report=wd))
         a = process_inbox(cfg)
         b = run_scheduled(cfg)
         # autocapture distillation + daily DB snapshot + recall cache (Article 13).
@@ -303,10 +313,15 @@ def main(argv: list[str] | None = None) -> None:
     cmd = argv[0] if argv else "tick"
     cfg = load_config()
     cat = load_catalog(cfg)
+    def _watchdog() -> None:
+        from .watchdog import run_watchdog
+        print(t(cat, "dispatch.main_watchdog"), run_watchdog(cfg).summary())
+
     {
         "tick": lambda: tick(cfg),
         "inbox": lambda: print(t(cat, "dispatch.main_inbox"), process_inbox(cfg)),
         "scheduled": lambda: print(t(cat, "dispatch.main_scheduled"), run_scheduled(cfg)),
+        "watchdog": _watchdog,
     }.get(cmd, lambda: tick(cfg))()
 
 

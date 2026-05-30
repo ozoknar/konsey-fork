@@ -12,6 +12,29 @@ unverified "it works" claims. Test evidence is cited where it backs an entry.
 
 ### Added
 
+- **Self-continuation & a resilience watchdog (S6) — opt-in, default OFF.** konsey can now
+  continue on its own after install AND recover failed/stalled runs instead of sitting dead.
+  New `council/watchdog.py`: a READ-only scan of the audit DB + APPEND-only actions (Art.
+  10/11.2 — never mutates an audit row) that each idempotent pass (a) **reaps** a STALLED
+  session (session_start with no session_end, idle past its wall-budget) by appending
+  `session_end(aborted-watchdog)` + an incident — so a stuck run can't fail-stop forever;
+  (b) **re-queues** a RETRIABLE failure (risk ≤ internal, under a bounded retry budget, a
+  bridge present) into the dispatch inbox, where the EXISTING autonomy ceiling re-gates it —
+  so the watchdog can never bypass a human gate; (c) **escalates** gated (pii/sensitive/
+  production) or budget-exhausted work to a human incident, once. It runs inside
+  `dispatch tick` (so the scheduler ticks it for free) and via a new `konsey watchdog` /
+  `python -m council.dispatch watchdog`. New `konsey enable automation` consciously opts in
+  (sets a dispatch `bridge_dir` so dispatch+watchdog are no longer inert + installs the OS
+  scheduler via `get_scheduler().install`, idempotent, reversible). **Reversibility fix
+  (Codex S6 finding):** `uninstall --automation` previously looked for a non-existent
+  module-level `scheduler.uninstall` and always reported a no-op — it now resolves the real
+  backend (`get_scheduler(cfg.scheduler).is_installed()/uninstall()`) so an installed
+  agent/timer/task is actually removed. `doctor` gains an automation observability line
+  (scheduler installed? dispatch bridge armed?). 13 new tests (watchdog reap/requeue/
+  escalate/idempotency/budget over a seeded temp DuckDB; the CLI surface with NullScheduler
+  so nothing touches the real OS). The autonomy ceiling (`dispatch.AutoGate`, public/internal
+  only) is untouched and is reused, not re-implemented.
+
 - **Distribution infrastructure (S5) — release-ready, but PUBLISHES NOTHING.** Everything
   needed to ship to PyPI/Homebrew is in place and mergeable, with zero publish risk.
   **Security fix (load-bearing):** a plain `python -m build` from a working tree leaked

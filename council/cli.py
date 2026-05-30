@@ -636,6 +636,7 @@ def _doctor_collect(cfg: Config) -> dict:
     _doctor_graph(cfg, results)
     _doctor_regime(cfg, results)
     _doctor_host_isolation(cfg, results)
+    _doctor_automation(cfg, results)
 
     checks: list[dict] = []
     critical = False
@@ -1149,6 +1150,8 @@ def cmd_agents(args: argparse.Namespace) -> int:
 def cmd_enable(args: argparse.Namespace) -> int:
     cfg = load_config()
     cat = load_catalog(cfg)
+    if args.what == "automation":
+        return _enable_automation(cfg, cat)
     if args.what != "capture":
         _err(t(cat, "cli.enable.usage"))
         return 2
@@ -1166,6 +1169,60 @@ def cmd_enable(args: argparse.Namespace) -> int:
     if rc != 0:
         return rc
     _emit(t(cat, "cli.enable.enabled", ok=_OK, path=path))
+    return 0
+
+
+def _enable_automation(cfg: Config, cat: dict) -> int:
+    """Consciously opt in to background self-continuation (Art. 14, default-OFF). Sets a
+    dispatch ``bridge_dir`` (so dispatch + the resilience watchdog are no longer inert) and
+    installs the OS scheduler to run ``dispatch tick`` periodically. Idempotent + reversible
+    (``konsey uninstall --automation``)."""
+    _emit(t(cat, "cli.enable.automation_explainer"))
+    if not _confirm(t(cat, "cli.enable.automation_now_q"), default=False):
+        _emit(t(cat, "cli.enable.left_disabled"))
+        return 0
+    path = cfg.config_path()
+    if not path.exists():
+        _err(t(cat, "cli.enable.no_profile"))
+        return 1
+    bridge = cfg.data_home / "bridge"
+    rc = _config_set_str(path, "bridge_dir", str(bridge))
+    if rc != 0:
+        return rc
+    from .platform.scheduler import get_scheduler
+    sched = get_scheduler(cfg.scheduler, cfg=cfg)
+    if sched.is_installed():
+        _emit(t(cat, "cli.enable.automation_already", ok=_OK, backend=cfg.scheduler))
+        return 0
+    try:
+        ok = sched.install(python=sys.executable, council_home=cfg.council_home)
+    except Exception as exc:
+        _err(t(cat, "cli.enable.automation_failed", exc=exc))
+        return 1
+    key = "cli.enable.automation_installed" if ok else "cli.enable.automation_noop"
+    _emit(t(cat, key, ok=_OK, backend=cfg.scheduler, bridge=bridge))
+    return 0
+
+
+def _config_set_str(path: Path, key: str, value: str) -> int:
+    """Set/replace a string scalar in council.local.toml (mirrors _config_set_bool, quoted)."""
+    new_line = f'{key} = "{_toml_escape(value)}"'
+    out: list[str] = []
+    replaced = False
+    in_table = False
+    for ln in path.read_text(encoding="utf-8").splitlines():
+        s = ln.strip()
+        if s.startswith("[[") or (s.startswith("[") and s.endswith("]")):
+            in_table = True
+        if not in_table and not replaced and "=" in s and s.split("=", 1)[0].strip() == key:
+            comment = "  " + ln[ln.index("#"):] if "#" in ln else ""
+            out.append(new_line + comment)
+            replaced = True
+            continue
+        out.append(ln)
+    if not replaced:
+        out.append(new_line)
+    path.write_text("\n".join(out) + "\n", encoding="utf-8")
     return 0
 
 
@@ -1222,23 +1279,57 @@ def cmd_stop(args: argparse.Namespace) -> int:
 # ---------------------------------------------------------------------------
 
 
+def _doctor_automation(cfg: Config, results: list[tuple[bool, str]]) -> None:
+    """Observability for background self-continuation: is the scheduler installed, is the
+    dispatch bridge armed? Always a PASS (automation is opt-in) — it just reports state so
+    'I enabled automation but nothing runs' is diagnosable."""
+    cat = load_catalog(cfg)
+    try:
+        from .platform.scheduler import get_scheduler
+        installed = get_scheduler(cfg.scheduler, cfg=cfg).is_installed()
+    except Exception:
+        installed = False
+    results.append((True, t(
+        cat, "cli.doctor.automation",
+        scheduler=cfg.scheduler,
+        installed=t(cat, "cli.doctor.automation_yes" if installed else "cli.doctor.automation_no"),
+        bridge=t(cat, "cli.doctor.automation_on" if cfg.bridge_dir else "cli.doctor.automation_off"),
+    )))
+
+
+def cmd_watchdog(args: argparse.Namespace) -> int:
+    """Run one resilience-watchdog pass now (reap stalled sessions + re-queue retriable
+    work + escalate gated/exhausted to a human). Idempotent; the scheduler also runs it."""
+    cfg = load_config()
+    cat = load_catalog(cfg)
+    from .watchdog import run_watchdog
+    rep = run_watchdog(cfg)
+    _emit(t(cat, "cli.watchdog.report", summary=rep.summary()))
+    for action in rep.actions:
+        _emit(f"  - {action}")
+    return 0
+
+
 def cmd_uninstall(args: argparse.Namespace) -> int:
     cfg = load_config()
     cat = load_catalog(cfg)
     removed: list[str] = []
     kept: list[str] = []
 
-    # Automation removal (scheduler/hook) — delegate to the platform layer if present.
+    # Automation removal (Art. 12 reversibility) — resolve the REAL backend instance and
+    # uninstall exactly what it installed. (Previously this looked for a module-level
+    # scheduler.uninstall that does not exist → it always reported a no-op and could never
+    # remove an installed agent/timer/task. Codex S6 finding.)
     if args.automation or args.all:
         try:
-            from .platform import scheduler as sched_mod
-
-            uninstaller = getattr(sched_mod, "uninstall", None)
-            if callable(uninstaller):
-                uninstaller(cfg)
+            from .platform.scheduler import get_scheduler
+            sched = get_scheduler(cfg.scheduler, cfg=cfg)
+            if not sched.is_installed():
+                removed.append(t(cat, "cli.uninstall.scheduler_noop"))
+            elif sched.uninstall():
                 removed.append(t(cat, "cli.uninstall.scheduler_removed"))
             else:
-                removed.append(t(cat, "cli.uninstall.scheduler_noop"))
+                kept.append(t(cat, "cli.uninstall.scheduler_kept", exc="uninstall returned False"))
         except Exception as exc:
             kept.append(t(cat, "cli.uninstall.scheduler_kept", exc=exc))
 
@@ -1370,8 +1461,11 @@ def build_parser() -> argparse.ArgumentParser:
     sp.set_defaults(func=cmd_agents)
 
     sp = sub.add_parser("enable", help="consciously opt in to optional automation")
-    sp.add_argument("what", choices=["capture"])
+    sp.add_argument("what", choices=["capture", "automation"])
     sp.set_defaults(func=cmd_enable)
+
+    sp = sub.add_parser("watchdog", help="run one resilience pass: reap stalled runs, re-queue retriable, escalate gated")
+    sp.set_defaults(func=cmd_watchdog)
 
     sp = sub.add_parser("stop", help="kill switch (Article 12)")
     sp.set_defaults(func=cmd_stop)
