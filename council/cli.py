@@ -41,6 +41,7 @@ from .config import (
     load_config,
 )
 from .i18n import load_catalog, t
+from .presets import DEFAULT_PRESET, PRESET_NAMES, normalize_preset, preset_overrides
 from . import execute, repair, worktree
 
 # ---------------------------------------------------------------------------
@@ -228,6 +229,8 @@ def _render_local_toml(
     node_name: str,
     locale: str,
     data_regime: str,
+    preset: str,
+    exec_sandbox: str,
     secret_backend: str,
     scheduler: str,
     notifier: str,
@@ -247,12 +250,13 @@ def _render_local_toml(
         f'node_name = "{_toml_escape(node_name)}"',
         f'locale = "{_toml_escape(locale)}"',
         f'data_regime = "{_toml_escape(data_regime)}"',
+        f'preset = "{_toml_escape(preset)}"          # posture: advisory | balanced | autonomous (S4)',
         "",
         f'secret_backend = "{_toml_escape(secret_backend)}"',
         f'scheduler = "{_toml_escape(scheduler)}"',
         f'notifier = "{_toml_escape(notifier)}"',
-        'exec_sandbox = "off"        # off | read-only | workspace-write',
-        "autocapture_enabled = false # opt-in; `council enable capture` flips this",
+        f'exec_sandbox = "{_toml_escape(exec_sandbox)}"        # off | read-only | workspace-write (set by preset)',
+        "autocapture_enabled = false # opt-in; `konsey enable capture` flips this",
         "",
         "# Roster — generic roles assigned to providers. Producer != verifier",
         "# (Article 2.4): keep at least one verifier of a different name enabled.",
@@ -291,6 +295,7 @@ def cmd_init(args: argparse.Namespace) -> int:
     if initial_locale not in _discover_locales():
         initial_locale = "en"
     cat = load_catalog(replace(cfg, locale=initial_locale))
+    preset = getattr(args, "preset", None)   # flag wins; None → asked (TTY) or defaulted
 
     # Decide whether to proceed AT ALL before claiming anything about defaults.
     if target.exists() and not args.reconfigure and not args.quick:
@@ -302,7 +307,7 @@ def cmd_init(args: argparse.Namespace) -> int:
     # Non-TTY honesty (Faz 1): now that we ARE proceeding, a piped run must not silently
     # feed _ask() its defaults and pretend the user answered — switch + SAY SO (stderr).
     if not quick and not _is_tty():
-        _err(t(cat, "cli.init.noninteractive_notice"))
+        _err(t(cat, "cli.init.noninteractive_notice", preset=normalize_preset(preset)))
         quick = True
 
     if quick:
@@ -318,6 +323,16 @@ def cmd_init(args: argparse.Namespace) -> int:
     _emit(t(cat, "cli.init.data_home", value=cfg.data_home))
     _emit(t(cat, "cli.init.os", value=_detect_os()))
 
+    # Posture preset (S4): flag > interactive Q2 > balanced. Resolved BEFORE the roster so
+    # the chosen posture decides advisory(lead-only)-vs-all enabling. Honest by construction
+    # (presets.py): no posture can grant workspace-write / autocapture / a compliance regime.
+    if not quick and preset is None:
+        preset = _ask(t(cat, "cli.init.ask_preset", choices="|".join(PRESET_NAMES)), DEFAULT_PRESET)
+    preset = normalize_preset(preset)
+    ov = preset_overrides(preset)
+    if not quick:
+        _emit(t(cat, "cli.init.preset_chosen", preset=preset))
+
     # 1) roster auto-detect
     detected = _detect_roster(extra_path)
     found = [(n, c) for (n, c, ok) in detected if ok]
@@ -327,23 +342,29 @@ def cmd_init(args: argparse.Namespace) -> int:
     if len(found) < 2:
         _emit(t(cat, "cli.init.few_providers", warn=_WARN))
 
+    # advisory posture enables ONE provider (→ single provider → honest advisory mode);
+    # balanced/autonomous enable every detected provider. "One" = the first DETECTED provider,
+    # NOT roster index 0 — so a machine where the nominal lead (e.g. claude) isn't installed
+    # still gets a working single-provider profile instead of an all-disabled one (Codex S4).
+    _first_detected = next((j for j, (_n, _c, dok) in enumerate(detected) if dok), None)
     roster: list[tuple[str, str, str, bool]] = []
     for i, (name, cli, ok) in enumerate(detected):
         role = _DEFAULT_ROLES[i] if i < len(_DEFAULT_ROLES) else ROLE_LEAD
-        roster.append((name, cli, role, ok))
+        enabled = ok and (ov["roster_enable"] == "all" or i == _first_detected)
+        roster.append((name, cli, role, enabled))
 
-    # 2) wizard (skipped entirely with --quick → safe defaults; locale already chosen above)
+    # 2) remaining wizard — owner + optional regime. org/node default "" (rarely needed;
+    #    settable later via `konsey config set`); locale + preset were resolved above.
     if quick:
-        owner, org, node_name, regime = "operator", "", "", "standard"
+        owner, regime = "operator", "standard"
     else:
         owner = _ask(t(cat, "cli.init.ask_owner"), "operator") or "operator"
-        org = _ask(t(cat, "cli.init.ask_org"), "")
-        node_name = _ask(t(cat, "cli.init.ask_node"), "")
         regime = _ask(t(cat, "cli.init.ask_regime", choices="|".join(_discover_regimes(cfg))), "standard").lower()
         if not regime:
             regime = "standard"   # accept ANY regime name (a pack may be added later); doctor warns if no pack
         if regime != "standard":
             _emit(t(cat, "cli.init.regime_warn", warn=_WARN, regime=regime))
+    org, node_name = "", ""
 
     secret_backend, scheduler, notifier = _detect_backends(extra_path)
 
@@ -353,6 +374,8 @@ def cmd_init(args: argparse.Namespace) -> int:
         node_name=node_name,
         locale=locale,
         data_regime=regime,
+        preset=preset,
+        exec_sandbox=ov["exec_sandbox"],
         secret_backend=secret_backend,
         scheduler=scheduler,
         notifier=notifier,
@@ -388,6 +411,15 @@ def cmd_init(args: argparse.Namespace) -> int:
         _emit(t(cat, "cli.init.isolation_note"))
     else:
         _emit(t(cat, "cli.init.isolation_clean"))
+
+    # S4 profile summary — the facts just written (distinct from `doctor`, which reports
+    # health). Reinforces the OFF-by-default execution state so the posture is never a surprise.
+    enabled_roster = " ".join(f"{n}({r})" for (n, _c, r, en) in roster if en) or "—"
+    exec_state = "OFF" if ov["exec_sandbox"] == "off" else f"ARMED ({ov['exec_sandbox']})"
+    _emit(t(cat, "cli.init.summary_header"))
+    _emit(t(cat, "cli.init.summary_profile", preset=preset, owner=owner, locale=locale, regime=regime))
+    _emit(t(cat, "cli.init.summary_roster", roster=enabled_roster))
+    _emit(t(cat, "cli.init.summary_exec", state=exec_state))
 
     _emit(t(cat, "cli.init.next_steps"))
     return 0
@@ -951,6 +983,7 @@ _SCALAR_KEYS = {
     "node_name",
     "locale",
     "data_regime",
+    "preset",
     "secret_backend",
     "scheduler",
     "notifier",
@@ -1286,6 +1319,10 @@ def build_parser() -> argparse.ArgumentParser:
     sp.add_argument("--reconfigure", action="store_true", help="overwrite an existing profile")
     sp.add_argument("--locale", default=None,
                     help="force interface language (any tag; unknown → falls back to en; else negotiated from $LANGUAGE/$LC_ALL/$LANG)")
+    sp.add_argument("--preset", choices=list(PRESET_NAMES), default=None,
+                    help="onboarding posture bundle (default balanced; asked interactively if omitted). "
+                         "advisory=single provider/read-only · balanced=full council, no writes · "
+                         "autonomous=arms real-work execution (still triple-locked at runtime)")
     sp.set_defaults(func=cmd_init)
 
     sp = sub.add_parser("doctor", help="evidence-based health check")

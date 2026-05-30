@@ -95,6 +95,7 @@ class Config:
     node_name: str = ""
     locale: str = "en"
     data_regime: str = "standard"           # standard|kvkk|gdpr|hipaa (Md.4.3)
+    preset: str = "balanced"                 # onboarding posture: advisory|balanced|autonomous (S4, provenance)
     agents: list[RosterEntry] = field(default_factory=list)
     projects: list[ProjectEntry] = field(default_factory=list)
     secret_backend: str = "null"            # keychain|secret-tool|wincred|envfile|null
@@ -228,6 +229,7 @@ def load_config(path: str | os.PathLike[str] | None = None) -> Config:
         node_name=str(data.get("node_name", base.node_name)),
         locale=str(data.get("locale", base.locale)) or base.locale,
         data_regime=str(data.get("data_regime", base.data_regime)) or base.data_regime,
+        preset=str(data.get("preset", base.preset)) or base.preset,   # old profiles → "balanced"
         agents=_coerce_agents(data.get("agents")),
         projects=_coerce_projects(data.get("projects")),
         secret_backend=str(data.get("secret_backend", base.secret_backend)) or base.secret_backend,

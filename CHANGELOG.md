@@ -12,6 +12,27 @@ unverified "it works" claims. Test evidence is cited where it backs an entry.
 
 ### Added
 
+- **Onboarding posture presets (S4) — `konsey init --preset advisory|balanced|autonomous`.**
+  `init` now leads with one opinionated POSTURE choice instead of a long question list
+  (rustup-style minimal/default/complete). A preset is a convenience bundle of
+  ALREADY-SAFE `Config` values — never a way to unlock something unsafe by name, enforced
+  by construction in the new pure `council/presets.py` and pinned by tests:
+  `advisory` = single provider + `exec_sandbox=off` (honest advisory mode), `balanced`
+  (default) = full council + no writes, `autonomous` = same but `exec_sandbox=read-only`
+  which only ARMS the first execution lock — `konsey do` still refuses without
+  `KONSEY_EXEC=1` + a TTY confirm, so no posture can silently grant writes. No preset
+  enables `workspace-write`, flips `autocapture_enabled`, or selects a non-`standard`
+  regime. Resolution is flag > interactive Q2 > balanced; `--preset` works headless and
+  the non-TTY notice now NAMES the applied preset. The wizard drops the rarely-needed
+  org/node questions (auto `""`, still settable via `konsey config set`), so interactive
+  init is shorter (locale → preset → owner → optional regime). A new `preset` scalar is
+  written to `council.local.toml` and added to `Config` (default `"balanced"` — old
+  profiles load unchanged) and to the `config get/set` scalar allow-list. `init` ends
+  with a short fact-only profile summary (posture/owner/roster/execution state — distinct
+  from `doctor` health). 14 new tests (pure table + honesty invariants, real `cmd_init`
+  writes, advisory→lead-only, non-TTY naming + flag-wins, backward-compat load, en/tr
+  parity); the existing init tests keep passing via `getattr(args, "preset", None)`.
+
 - **Installer UX + crash-resistance (S3) — engaging, degrades cleanly, always
   completes or fails honestly.** `install.sh` gains a one-shot capability layer
   (`UI_COLOR/UI_UNICODE/UI_TTY/UI_WIDTH`, honoring `NO_COLOR` veto /
