@@ -44,7 +44,9 @@ PREFLIGHT → PLAN → CRITIQUE → SYNTHESIZE → EXECUTE → VERIFY → DECIDE
 - **PREFLIGHT** — risk classification + secret/PHI fail-safe gate.
 - **PLAN / CRITIQUE / SYNTHESIZE** — Lead drafts, Critic attacks adversarially, Lead
   reconciles.
-- **EXECUTE** — runs the agreed work under an execution safety boundary.
+- **EXECUTE** — under an execution safety boundary. Today the loop produces the work as
+  provider *output* and human-gates anything destructive; it does **not** shell out — real
+  file/command execution is the opt-in `konsey do` path (see [§9](#9-status--maturity)).
 - **VERIFY** — a *different provider* than the executor checks the result
   (producer ≠ verifier).
 - **DECIDE** — evidence-weighted score, not a vote.
@@ -174,7 +176,10 @@ ceiling/floor, append-only) can be *tightened* by a profile or session, never
 
 ## 9. Status / maturity
 
-**Honest, current state — v0.1.0 MVP (Phase 0+1 complete, Phase 2 in progress).**
+**Honest, current state — v0.1.0, _alpha_ (Phase 0+1 complete, Phase 2 in progress).**
+The decision architecture and safety gates are real and tested; live multi-provider
+tool-on execution, node-isolation _enforcement_, and live systemd/Windows daemons are
+not yet mature — this is alpha, not beta.
 
 - The core is **implemented and tested**: the full CLI (`init` / `doctor` / `run` /
   `status` / `audit` / `config` / `agents` / `enable` / `stop` / `uninstall`) plus the
@@ -182,13 +187,26 @@ ceiling/floor, append-only) can be *tightened* by a profile or session, never
   9-state loop) / `audit` / `capture` / `dispatch`. The configuration contract
   (`Config`, `RosterEntry`, `by_role()`, `verifier(exclude=)`, `available()`) is the
   single injection point.
-- **Test evidence: 92/92 pass** (`python -m pytest`), covering config/bootstrap, the
-  risk gateway, the secret scan, append-only audit, adapters, and the evidence-weighted
-  decide. Verified on Python 3.12 (the CI baseline and the proven floor). Newer
-  interpreters (3.13/3.14) are expected to work but 3.12 is what CI pins.
+- **Test evidence: the suite is green** — run `python -m pytest` for the live count
+  (361 as of this writing, and growing). It covers config/bootstrap, the risk gateway,
+  the secret scan, append-only audit, adapters, the evidence-weighted decide, the
+  resilience watchdog, onboarding presets, the de-domestication regime/locale layer, and
+  the installer self-test. Verified on Python 3.12 (the CI baseline and the proven
+  floor). Newer interpreters (3.13/3.14) are expected to work but 3.12 is what CI pins.
+- **What is and isn't distributed yet — read this.** The always-on loop (`konsey run`)
+  distributes the *decision*: it runs the providers in their roles (lead plans, critic
+  attacks adversarially, distiller synthesizes) across PLAN/CRITIQUE/SYNTHESIZE and
+  scores an evidence-weighted, cross-verified decision on their **text** output — the
+  loop itself does not shell out or apply changes (`graph.py`). **Real-work execution**
+  (`konsey do`, Faz 3a) — a sandboxed provider editing an isolated git worktree — is
+  **opt-in, single-provider, triple-locked, and NOT wired into that loop**; cross-provider
+  fan-out (3b) and graph integration (3c) are **Phase 2**. So today konsey distributes
+  the *decision* fully and executes work in a bounded, opt-in slice — not yet work fanned
+  out across providers in the always-on loop. (`konsey enable automation` adds an opt-in
+  scheduler + a resilience watchdog that recovers stalled/failed runs.)
 - **Verified platforms.** macOS is the primary development target. A **fresh Linux
   install was audited end-to-end** (Docker `python:3.12-slim`: install → init → doctor
-  → run + `cron` scheduler install/uninstall round-trip + pytest 92/92, all green); the
+  → run + `cron` scheduler install/uninstall round-trip + pytest, all green); the
   macOS-only backends correctly returned no-ops on Linux without raising. **Not yet
   exercised with a live background daemon: systemd user timers and Windows Task
   Scheduler** — those backends exist but are unvalidated against a running scheduler

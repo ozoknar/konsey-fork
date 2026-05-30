@@ -1,7 +1,9 @@
 # Known Limitations / Bilinen Sınırlar (Phase 2 backlog)
 
 > Honest scope statement (Constitution Art. 2.1 — no unverified "it works" claims).
-> The MVP core is functional and tested (92/92, incl. a fresh Linux Docker install). The items in the
+> Maturity: **alpha** (v0.1.0; Phase 0+1 complete, Phase 2 in progress). The core is
+> functional and tested (run `python -m pytest` for the live count — 361 as of this
+> writing; the original v0.1.0 audit was 92/92, incl. a fresh Linux Docker install). The items in the
 > two sections below are deliberately deferred and must NOT be presented as already-complete; items that
 > have since been fixed and verified are moved down to the **Resolved** sections (with their evidence).
 
@@ -82,9 +84,6 @@
   `cfg`; with a *non-default* injected config the audit layer may resolve its DB via
   `load_config()` defaults. The default single-config install is correct; multi-config
   isolation is Phase 2.
-- **`run --dry-run` config application.** Dry-run preflight uses gateway defaults; the
-  project risk-registry / data-regime from `council.local` are not yet applied to dry-run
-  classification (live `run` path applies them).
 - **i18n — only prompts externalized so far.** The LLM-facing **prompts** are in `locales/{en,tr}.json`
   (en canonical, tr full mirror, per-key fallback). But **non-prompt UI/diagnostic/report strings**
   (doctor lines, report headers, decision rationale, gateway notes in `graph.py`/`cli.py`/`gateway.py`)
@@ -108,9 +107,6 @@
 - **Audit cfg geçişi.** `graph.py` audit çağrıları `user=cfg.owner` geçiyor ama tam `cfg`
   geçmiyor; *varsayılan-olmayan* enjekte config'te audit DB'sini `load_config()` varsayılanıyla
   çözebilir. Varsayılan tek-config kurulum doğru; çoklu-config izolasyonu Faz 2.
-- **`run --dry-run` config uygulaması.** Dry-run preflight gateway varsayılanlarını kullanır;
-  `council.local`'daki proje risk-sicili / veri-rejimi dry-run sınıflandırmasına henüz
-  uygulanmıyor (canlı `run` yolu uygular).
 - **i18n kataloğu.** `en.json` kanonik; `tr.json` ve tam prompt dışsallaştırması kısmi.
 - **Canlı-daemon scheduler doğrulaması (systemd / Windows).** `cron` scheduler + `Null*`
   fallback'leri Linux'ta doğrulandı (bkz. Resolved). **Çalışan bir daemon'a karşı henüz
@@ -134,6 +130,10 @@
   systemd/Windows daemons remain open above.)
 - **`doctor` advisory-mode visibility.** `doctor` now warns when 0 providers are runnable
   (CANNOT run) and when fewer than 2 are runnable (advisory mode, no cross-validation).
+- **`run --dry-run` now applies the profile (was Phase 2 in this file).** Dry-run
+  preflight passes the loaded `cfg` to `gateway.preflight`, so the project risk-registry /
+  data-regime from `council.local` are applied to dry-run classification, matching the live
+  `run` path (`cli.py` `cmd_run` dry-run branch).
 
 ## Resolved in the MVP audit round (cross-provider council found, fixed + verified)
 

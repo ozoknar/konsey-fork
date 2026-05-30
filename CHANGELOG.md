@@ -10,6 +10,23 @@ unverified "it works" claims. Test evidence is cited where it backs an entry.
 
 ## [Unreleased] — Phase 2 (in progress)
 
+### Changed
+
+- **Honesty pass (S8) — docs match reality (Constitution Art. 2.1).** A whole-project
+  council re-evaluation (7 dimensions + Codex adversarial) returned VERDICT: OVERCLAIMS at
+  maturity = **alpha**; this lands the doctrine-required corrections. The stale "92/92"
+  test count (true at v0.1.0, now 361) is replaced in README / README.tr / KNOWN_ISSUES
+  with "run `pytest` for the live count" + the current snapshot; the maturity label is now
+  explicitly **alpha**, not beta. A new "what is and isn't distributed yet" callout states
+  honestly that the always-on `konsey run` loop distributes the DECISION on provider TEXT
+  (it does not shell out — `graph.py`); real-work execution (`konsey do`, Faz 3a) is
+  opt-in, single-provider, triple-locked, and NOT in that loop — fan-out (3b) + graph
+  integration (3c) stay Phase 2. So "distribute work across providers" is partly shipped
+  (decision) and partly roadmap (work-in-loop). The stale `run --dry-run` KNOWN_ISSUE is
+  moved to Resolved (the code now passes `cfg`). A regression test guards the 92/92 claim
+  and the alpha/callout from reappearing. (Historical "92/92" records in the CHANGELOG
+  [0.1.0] and the Resolved sections are left intact — they accurately describe the past.)
+
 ### Added
 
 - **Onboarding fluidity & honesty (S7) — a guided wizard, not an interrogation.** `konsey

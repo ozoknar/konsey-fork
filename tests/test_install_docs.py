@@ -72,8 +72,9 @@ def test_readmes_do_not_over_claim() -> None:
         assert "documented stubs" not in body, f"{path.name} still says 'documented stubs'"
         assert "being ported in Phase 2" not in body, f"{path.name}: stale 'being ported'"
         assert "Faz 2'de taşınıyor" not in body, f"{path.name}: stale TR 'being ported'"
-        # The maturity section should cite the verified test count, not silence.
-        assert "92/92" in body, f"{path.name}: missing 92/92 test evidence"
+        # The maturity section should cite test evidence, not silence — and point at the
+        # live source of truth (pytest) rather than a frozen count that goes stale (S8).
+        assert "pytest" in body, f"{path.name}: missing pytest test-evidence reference"
 
 
 def test_readmes_link_existing_docs_not_phase2_placeholders() -> None:

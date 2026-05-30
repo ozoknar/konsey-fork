@@ -47,7 +47,9 @@ PREFLIGHT → PLAN → CRITIQUE → SYNTHESIZE → EXECUTE → VERIFY → DECIDE
 - **PREFLIGHT** — risk sınıflaması + secret/PHI fail-safe gate.
 - **PLAN / CRITIQUE / SYNTHESIZE** — Lead taslak yazar, Critic adversarial eleştirir,
   Lead uzlaştırır.
-- **EXECUTE** — uzlaşılan işi bir yürütme güvenlik sınırı altında koşar.
+- **EXECUTE** — bir yürütme güvenlik sınırı altında. Bugün döngü işi sağlayıcı *çıktısı*
+  olarak üretir ve yıkıcı olanı insan-kapısına alır; shell'e **çıkmaz** — gerçek dosya/komut
+  yürütme opt-in `konsey do` yoludur (bkz. [§9](#9-durum--olgunluk)).
 - **VERIFY** — sonucu, yürütenden *farklı bir sağlayıcı* doğrular
   (üreten ≠ doğrulayan).
 - **DECIDE** — oy değil, kanıt-ağırlıklı skor.
@@ -178,7 +180,10 @@ yalnız-ekleme) bir profil veya oturum tarafından *sıkılaştırılabilir*, as
 
 ## 9. Durum / olgunluk
 
-**Dürüst, güncel durum — v0.1.0 MVP (Faz 0+1 tamam, Faz 2 sürüyor).**
+**Dürüst, güncel durum — v0.1.0, _alpha_ (Faz 0+1 tamam, Faz 2 sürüyor).**
+Karar mimarisi ve güvenlik kapıları gerçek ve test edilmiş; canlı çok-sağlayıcı tool-on
+yürütme, node-isolation _enforcement_'ı ve canlı systemd/Windows daemon'ları henüz olgun
+değil — bu beta değil, alpha'dır.
 
 - Çekirdek **uygulandı ve test edildi**: tam CLI (`init` / `doctor` / `run` /
   `status` / `audit` / `config` / `agents` / `enable` / `stop` / `uninstall`) ve
@@ -186,13 +191,25 @@ yalnız-ekleme) bir profil veya oturum tarafından *sıkılaştırılabilir*, as
   (9-durumlu döngü) / `audit` / `capture` / `dispatch`. Yapılandırma kontratı
   (`Config`, `RosterEntry`, `by_role()`, `verifier(exclude=)`, `available()`) tek
   enjeksiyon noktasıdır.
-- **Test kanıtı: 92/92 geçer** (`python -m pytest`); config/bootstrap, risk gateway,
-  secret tarama, yalnız-ekleme audit, adapter'lar ve kanıt-ağırlıklı decide kapsanır.
-  Python 3.12'de (CI tabanı ve kanıtlanmış taban) doğrulandı. Daha yeni yorumlayıcıların
-  (3.13/3.14) çalışması beklenir ama CI 3.12'ye sabitlenmiştir.
+- **Test kanıtı: paket yeşil** — canlı sayı için `python -m pytest` çalıştırın (bu yazı
+  itibarıyla 361 ve artıyor); config/bootstrap, risk gateway, secret tarama, yalnız-ekleme
+  audit, adapter'lar, kanıt-ağırlıklı decide, dayanıklılık watchdog'u, onboarding presetleri,
+  de-domestikasyon rejim/locale katmanı ve installer self-test kapsanır. Python 3.12'de (CI
+  tabanı ve kanıtlanmış taban) doğrulandı; 3.13/3.14 çalışması beklenir, CI 3.12'ye sabit.
+- **Henüz ne dağıtılıyor ne dağıtılmıyor — bunu okuyun.** Her-zaman-açık döngü (`konsey run`)
+  *kararı* dağıtır: sağlayıcıları rollerinde koşar (lead planlar, critic adversarial saldırır,
+  distiller sentezler) PLAN/CRITIQUE/SYNTHESIZE boyunca ve onların **metin**
+  çıktısı üstünde kanıt-ağırlıklı, çapraz-doğrulanmış bir karar puanlar — döngünün kendisi
+  shell'e çıkmaz, değişiklik uygulamaz (`graph.py`). **Gerçek-iş yürütme** (`konsey do`,
+  Faz 3a) — sandboxlı bir sağlayıcının izole git worktree'de düzenleme yapması — **opt-in,
+  tek-sağlayıcı, üçlü-kilitli ve o döngüye bağlı DEĞİL**; çapraz-sağlayıcı fan-out (3b) +
+  graph entegrasyonu (3c) **Faz 2**'dir. Yani bugün konsey *kararı* tam dağıtır, işi
+  sınırlı/opt-in bir dilimde yürütür — henüz her-zaman-açık döngüde sağlayıcılara dağıtılmış
+  iş değil. (`konsey enable automation` opt-in zamanlayıcı + takılan/başarısız koşuları
+  kurtaran dayanıklılık watchdog'u ekler.)
 - **Doğrulanan platformlar.** macOS birincil geliştirme hedefidir. **Sıfırdan bir Linux
   kurulumu uçtan uca denetlendi** (Docker `python:3.12-slim`: install → init → doctor
-  → run + `cron` scheduler kur/kaldır turu + pytest 92/92, hepsi yeşil); yalnız-macOS
+  → run + `cron` scheduler kur/kaldır turu + pytest, hepsi yeşil); yalnız-macOS
   backend'leri Linux'ta hata fırlatmadan doğru biçimde no-op döndürdü. **Canlı bir arka
   plan daemon'ı ile henüz denenmedi: systemd kullanıcı timer'ları ve Windows Task
   Scheduler** — bu backend'ler mevcut ama çalışan bir scheduler'a karşı doğrulanmadı
