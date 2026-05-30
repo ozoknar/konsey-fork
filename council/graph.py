@@ -29,7 +29,7 @@ from .config import (
     available,
 )
 from .decide import decide
-from .exec_policy import classify_command, mark_untrusted, redact_secrets
+from .exec_policy import classify_command, mark_untrusted, redact_secrets, unwrap_untrusted
 from .gateway import preflight as gw_preflight
 from .i18n import load_catalog, t
 
@@ -274,7 +274,10 @@ def verify(s: S, cfg: Config) -> dict:
     text, d = _ask(s, cfg, verifier,
                    prompts.prompt("verify", cat, task=s["task"], execution=s.get("execution", "")[:2500]),
                    "verify")
-    ok = "PASS" in text.split("\n", 1)[0].upper()
+    # The verifier's VERDICT line is the BODY of the untrusted-data envelope (_ask wraps
+    # every adapter output via mark_untrusted) — unwrap before reading the first-line verdict,
+    # otherwise the envelope marker is always line 0 and a PASS can never be detected.
+    ok = "PASS" in unwrap_untrusted(text).split("\n", 1)[0].upper()
     if ok:
         audit.evidence(s["session_id"], "cross_validation", f"{verifier} VERDICT PASS", verifier,
                        "orchestrator", cfg=cfg)

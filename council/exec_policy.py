@@ -211,3 +211,19 @@ def mark_untrusted(tool_output: str) -> str:
     # Defang obvious injection directives so they read as data, not commands.
     body = _INJECTION_MARKERS.sub(r"[untrusted-directive:\1]", body)
     return f"{_UNTRUSTED_OPEN}\n{body}\n{_UNTRUSTED_CLOSE}"
+
+
+def unwrap_untrusted(text: str) -> str:
+    """Strip the ``mark_untrusted`` data-envelope for PARSING ONLY — e.g. reading a
+    verifier's ``VERDICT: PASS/FAIL`` line, which is the BODY, not the envelope marker.
+
+    This does NOT re-trust the content; it only removes the wrapper so a contract token on
+    the body's first line can be read. Text that is not wrapped is returned unchanged. (The
+    9-state graph wraps every adapter output via ``mark_untrusted`` before the next node
+    sees it; ``verify`` must therefore unwrap before checking the first-line verdict.)"""
+    if not text or not text.startswith(_UNTRUSTED_OPEN):
+        return text or ""
+    body = text[len(_UNTRUSTED_OPEN):].lstrip("\n")
+    if body.endswith(_UNTRUSTED_CLOSE):
+        body = body[: -len(_UNTRUSTED_CLOSE)].rstrip("\n")
+    return body
