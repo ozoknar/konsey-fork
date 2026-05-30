@@ -1,0 +1,76 @@
+# Release pipeline (S5) — PREPARE-only.
+#
+# The `build` job is ALWAYS safe: it builds sdist+wheel from a CLEAN checkout,
+# runs `twine check --strict`, and PROVES no machine/doctrine files leaked. It
+# NEVER uploads.
+#
+# The `publish-pypi` job is INERT by FOUR independent locks, so merging this file
+# cannot publish anything:
+#   1. it only triggers on a `v*` tag (not on push/PR),
+#   2. `environment: pypi-release` — that environment does not exist yet, so the job
+#      cannot start until the owner creates it (with required reviewers),
+#   3. it uses OIDC (`id-token: write`) with NO API token and NO `contents: write`, and
+#   4. the actual upload step is COMMENTED OUT.
+# Enabling a real publish is a deliberate, documented, human action — see RELEASING.md.
+name: release
+
+on:
+  workflow_dispatch:          # manual trigger (build+check only)
+  pull_request:               # validate on PRs (no upload path exists)
+  push:
+    tags: ["v*"]              # a version tag runs build; upload stays gated below
+
+permissions:
+  contents: read              # default-deny; jobs opt into id-token individually
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4          # CLEAN tree → no gitignored-file leak
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python -m pip install --upgrade build twine
+      - name: Build sdist + wheel
+        run: python -m build
+      - name: Validate metadata
+        run: twine check --strict dist/*
+      - name: Assert no machine-facts / doctrine draft leaked into the sdist
+        run: |
+          tar tzf dist/*.tar.gz | tee /tmp/sdist-files.txt
+          if grep -qiE 'KONSEY_ANAYASASI\.md|council\.local\.toml|\.gitleaks\.toml' /tmp/sdist-files.txt; then
+            echo "::error::sdist leaked a machine/doctrine file (Constitution Art. 2/13)"
+            exit 1
+          fi
+      - name: Assert version single-source matches the tag
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          PKG=$(python -c "import council; print(council.__version__)")
+          TAG="${GITHUB_REF_NAME#v}"
+          test "$PKG" = "$TAG" || { echo "::error::__version__=$PKG != tag $TAG"; exit 1; }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+  # INERT until the owner acts (see locks 1–4 in the header). Kept here so the
+  # publish path is reviewed + version-controlled, NOT improvised at release time.
+  publish-pypi:
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')   # lock 1: tags only
+    runs-on: ubuntu-latest
+    environment: pypi-release                    # lock 2: env absent → job cannot start
+    permissions:
+      id-token: write                            # lock 3: OIDC only — no tokens, no contents:write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+      # lock 4: the real upload is intentionally disabled for S5 (PREPARE-only).
+      # Configure a PyPI Trusted Publisher + create the `pypi-release` environment,
+      # then UNCOMMENT the next two lines (see RELEASING.md). NEVER add an API token.
+      # - name: Publish to PyPI (Trusted Publisher / OIDC)
+      #   uses: pypa/gh-action-pypi-publish@release/v1
+      - run: echo "Publish is intentionally disabled (S5 PREPARE-only). See RELEASING.md."

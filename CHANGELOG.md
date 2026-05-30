@@ -12,6 +12,29 @@ unverified "it works" claims. Test evidence is cited where it backs an entry.
 
 ### Added
 
+- **Distribution infrastructure (S5) — release-ready, but PUBLISHES NOTHING.** Everything
+  needed to ship to PyPI/Homebrew is in place and mergeable, with zero publish risk.
+  **Security fix (load-bearing):** a plain `python -m build` from a working tree leaked
+  gitignored machine/doctrine files into the sdist — verified it shipped `council.local.toml`
+  (a machine profile) and `constitution/KONSEY_ANAYASASI.md` (the live doctrine draft),
+  violating Constitution Art. 2/13. Fixed with an explicit `[tool.hatch.build.targets.sdist]`
+  ALLOWLIST (the sdist is now a closed set; only `constitution/README.md` — the CC-BY
+  summary — ships, never the draft), plus a CI grep guard and a pytest that builds the real
+  sdist and asserts the leak is gone. The version is now single-sourced from
+  `council/__init__.py` via `[tool.hatch.version]` (no more duplicated literal); `twine`
+  joins `[dev]` and `twine check --strict` passes on both artifacts; project URLs point at
+  the real org. New `.github/workflows/release.yml` builds + `twine check` + leak-guards on
+  every PR/dispatch/tag but the **upload is inert under four independent locks** (tags-only +
+  a `pypi-release` environment that does not exist yet + OIDC-only/no-tokens + the publish
+  step commented out) — so merging it cannot publish. New `packaging/konsey.rb` (Homebrew
+  personal-tap scaffold, placeholders) and `RELEASING.md` (the exact human steps for the
+  eventual, owner-approved, irreversible publish: PyPI Trusted Publisher, TestPyPI dry-run,
+  tag, environment approval, brew sha256). 6 new tests (dynamic-version single-source, sdist
+  allowlist excludes the leak files / includes the required ones, real-build leak proof).
+  **Not done here (deliberate, owner-gated):** the actual public publish — claiming the
+  `konsey-cli` name + going public — remains a separate manual act pending the patent /
+  dual-license review.
+
 - **Onboarding posture presets (S4) — `konsey init --preset advisory|balanced|autonomous`.**
   `init` now leads with one opinionated POSTURE choice instead of a long question list
   (rustup-style minimal/default/complete). A preset is a convenience bundle of

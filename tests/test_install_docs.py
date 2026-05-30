@@ -35,7 +35,7 @@ def _sh() -> str | None:
 @pytest.mark.skipif(_sh() is None, reason="no POSIX sh on PATH")
 def test_install_sh_is_valid_posix() -> None:
     """``sh -n`` parses the installer without error (no syntax regression)."""
-    proc = subprocess.run([_sh(), "-n", str(INSTALL_SH)], capture_output=True, text=True)
+    proc = subprocess.run([_sh() or "sh", "-n", str(INSTALL_SH)], capture_output=True, text=True)
     assert proc.returncode == 0, proc.stderr
 
 

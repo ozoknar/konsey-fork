@@ -22,6 +22,7 @@ INSTALL_SH = REPO / "install.sh"
 ESC = "\x1b"  # an ANSI escape byte — present iff color was emitted
 
 pytestmark = pytest.mark.skipif(shutil.which("sh") is None, reason="no POSIX sh on PATH")
+_SH = shutil.which("sh") or "sh"   # str (the skipif above guarantees sh exists at runtime)
 
 
 def _run_selftest(mode: str = "1", **extra_env) -> subprocess.CompletedProcess:
@@ -30,7 +31,7 @@ def _run_selftest(mode: str = "1", **extra_env) -> subprocess.CompletedProcess:
     env = {"PATH": os.environ.get("PATH", ""), "KONSEY_UI_SELFTEST": mode}
     env.update({k: v for k, v in extra_env.items() if v is not None})
     return subprocess.run(
-        [shutil.which("sh"), str(INSTALL_SH)],
+        [_SH, str(INSTALL_SH)],
         capture_output=True, text=True, cwd=str(REPO), env=env,
     )
 
@@ -101,7 +102,7 @@ def _run_selftest_on_pty(mode: str = "1", **extra_env) -> str:
     env.update({k: v for k, v in extra_env.items() if v is not None})
     master, slave = pty.openpty()
     proc = subprocess.Popen(
-        [shutil.which("sh"), str(INSTALL_SH)],
+        [_SH, str(INSTALL_SH)],
         stdout=slave, stderr=subprocess.DEVNULL, cwd=str(REPO), env=env,
     )
     os.close(slave)

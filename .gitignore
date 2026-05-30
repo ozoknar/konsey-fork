@@ -23,6 +23,7 @@
 !*.txt
 !*.sh
 !*.ps1
+!*.rb
 !*.json
 !*.sql
 !*.yml

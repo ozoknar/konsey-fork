@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "konsey-cli"
-version = "0.1.0"
+dynamic = ["version"]              # single-sourced from council/__init__.py (see [tool.hatch.version])
 description = "Multi-agent, evidence-weighted, vendor-independent work doctrine and terminal orchestrator."
 readme = "README.md"
 requires-python = ">=3.12"
@@ -33,6 +33,7 @@ dev = [
     "pytest",
     "mypy",
     "build",
+    "twine",          # `twine check` validates release metadata (S5; no upload)
 ]
 
 [project.scripts]
@@ -40,8 +41,41 @@ konsey = "council.cli:main"    # canonical command (S0: konsey is now the primar
 council = "council.cli:main"   # deprecated alias — kept fully working; prints a one-line notice on a TTY
 
 [project.urls]
-Homepage = "https://github.com/OWNER/konsey"
-Repository = "https://github.com/OWNER/konsey"
+Homepage = "https://github.com/eMediquality/konsey"
+Repository = "https://github.com/eMediquality/konsey"
+Changelog = "https://github.com/eMediquality/konsey/blob/master/CHANGELOG.md"
+Issues = "https://github.com/eMediquality/konsey/issues"
+
+# Single-source the version from council/__init__.py (__version__); bump there only.
+[tool.hatch.version]
+path = "council/__init__.py"
+
+# SECURITY (S5): an explicit sdist ALLOWLIST. Building from a working tree would
+# otherwise pull gitignored machine/doctrine files into the tarball — verified: a plain
+# `python -m build` shipped council.local.toml (a machine profile) and
+# constitution/KONSEY_ANAYASASI.md (the live doctrine draft). Listing `include` makes the
+# sdist a closed set; `exclude` is belt-and-suspenders. Only constitution/README.md (the
+# CC-BY summary) ships — never the draft (Constitution Art. 2/13: no machine-facts shipped).
+[tool.hatch.build.targets.sdist]
+include = [
+    "/council",
+    "/regimes",
+    "/constitution/README.md",
+    "/examples",
+    "/README.md", "/README.tr.md",
+    "/LICENSE", "/NOTICE",
+    "/CHANGELOG.md", "/KNOWN_ISSUES.md", "/SECURITY.md", "/CONTRIBUTING.md",
+    "/install.sh",
+    "/requirements.txt", "/requirements-dev.txt",
+    "/pyproject.toml",
+]
+exclude = [
+    "constitution/KONSEY_ANAYASASI.md",   # live doctrine working draft — never ship
+    "council.local.toml", "council.local.*",
+    ".gitleaks.toml",
+    "tests", ".github",
+    "**/__pycache__",
+]
 
 [tool.hatch.build.targets.wheel]
 packages = ["council"]
