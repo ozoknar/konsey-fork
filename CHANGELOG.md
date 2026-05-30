@@ -12,6 +12,24 @@ unverified "it works" claims. Test evidence is cited where it backs an entry.
 
 ### Added
 
+- **Onboarding fluidity & honesty (S7) — a guided wizard, not an interrogation.** `konsey
+  init` keeps its exact branching but gains the connective copy that makes a new user feel
+  guided and in control (people want fluidity + usability as much as security). Additive,
+  interactive-only (piped / `--quick` stay terse), no security regression, and — per the
+  Codex evaluation — copy/clarity, NOT a structural refactor. New: a one-screen **welcome**
+  (what konsey is + what the wizard sets up); a **posture preamble** that explains, BEFORE
+  the question, exactly how much each level lets konsey touch the system (and that the
+  `autonomous` label only arms read-only — no posture ever grants a blind write); the
+  **data-regime liability disclaimer moved BEFORE** its question (was only shown after, too
+  late to reconsider); **answer echoes** ("✓ language: en", "✓ owner: …"); the real
+  **append-only audit trail surfaced honestly** in the summary (its DB path + `konsey
+  audit` — no fabricated "memory" feature, just discoverability of what exists); and a
+  confident **"three things to try next"** close that also offers the S6 self-continuation
+  (`konsey doctor` · `konsey run` · `konsey enable automation`). 4 new tests (guided
+  interactive copy, --quick stays terse but keeps the facts, honest audit surfacing, en/tr
+  parity). The wizard's actual question flow and the non-TTY honest-defaults path are
+  unchanged.
+
 - **Self-continuation & a resilience watchdog (S6) — opt-in, default OFF.** konsey can now
   continue on its own after install AND recover failed/stalled runs instead of sitting dead.
   New `council/watchdog.py`: a READ-only scan of the audit DB + APPEND-only actions (Art.

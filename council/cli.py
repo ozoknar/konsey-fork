@@ -310,6 +310,10 @@ def cmd_init(args: argparse.Namespace) -> int:
         _err(t(cat, "cli.init.noninteractive_notice", preset=normalize_preset(preset)))
         quick = True
 
+    # S7: a one-screen welcome (what konsey is + what this wizard will set up) so a new
+    # user feels guided, not interrogated. Interactive only — piped/--quick stay terse.
+    if not quick:
+        _emit(t(cat, "cli.init.welcome"))
     if quick:
         locale = initial_locale
     else:
@@ -317,6 +321,7 @@ def cmd_init(args: argparse.Namespace) -> int:
         if locale not in _discover_locales():
             locale = initial_locale
         cat = load_catalog(replace(cfg, locale=locale))   # re-bind: rest of init in chosen language
+        _emit(t(cat, "cli.init.echo_locale", ok=_OK, value=locale))
 
     _emit(t(cat, "cli.init.bootstrap"))
     _emit(t(cat, "cli.init.council_home", value=cfg.council_home))
@@ -327,6 +332,9 @@ def cmd_init(args: argparse.Namespace) -> int:
     # the chosen posture decides advisory(lead-only)-vs-all enabling. Honest by construction
     # (presets.py): no posture can grant workspace-write / autocapture / a compliance regime.
     if not quick and preset is None:
+        # S7: explain WHAT each posture lets konsey touch BEFORE the question (the
+        # 'autonomous' name only arms read-only; the choice is security-critical).
+        _emit(t(cat, "cli.init.preset_preamble"))
         preset = _ask(t(cat, "cli.init.ask_preset", choices="|".join(PRESET_NAMES)), DEFAULT_PRESET)
     preset = normalize_preset(preset)
     ov = preset_overrides(preset)
@@ -359,6 +367,10 @@ def cmd_init(args: argparse.Namespace) -> int:
         owner, regime = "operator", "standard"
     else:
         owner = _ask(t(cat, "cli.init.ask_owner"), "operator") or "operator"
+        _emit(t(cat, "cli.init.echo_owner", ok=_OK, value=owner))
+        # S7: the liability disclaimer comes BEFORE the regime question (was only after),
+        # so the user can reconsider rather than learn the caveat too late.
+        _emit(t(cat, "cli.init.regime_preamble"))
         regime = _ask(t(cat, "cli.init.ask_regime", choices="|".join(_discover_regimes(cfg))), "standard").lower()
         if not regime:
             regime = "standard"   # accept ANY regime name (a pack may be added later); doctor warns if no pack
@@ -420,6 +432,8 @@ def cmd_init(args: argparse.Namespace) -> int:
     _emit(t(cat, "cli.init.summary_profile", preset=preset, owner=owner, locale=locale, regime=regime))
     _emit(t(cat, "cli.init.summary_roster", roster=enabled_roster))
     _emit(t(cat, "cli.init.summary_exec", state=exec_state))
+    # S7: surface the REAL append-only audit trail honestly (it is discoverable, not hidden).
+    _emit(t(cat, "cli.init.summary_audit", db=new_cfg.db_path()))
 
     _emit(t(cat, "cli.init.next_steps"))
     return 0
