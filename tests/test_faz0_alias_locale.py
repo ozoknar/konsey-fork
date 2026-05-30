@@ -42,7 +42,7 @@ def test_prog_name_reflects_invoked_command(monkeypatch):
     monkeypatch.setattr(sys, "argv", ["council"])
     assert _prog_name() == "council"
     monkeypatch.setattr(sys, "argv", ["/usr/bin/python3", "-m", "council.cli"])
-    assert _prog_name() == "council"   # module/-m invocation falls back to canonical
+    assert _prog_name() == "konsey"    # module/-m invocation falls back to canonical (konsey as of S0)
 
 
 # --------------------------------------------------------------------------- #

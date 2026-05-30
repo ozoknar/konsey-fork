@@ -1,5 +1,5 @@
 #!/usr/bin/env sh
-# Council installer — POSIX, idempotent, sudo-free (Constitution Article 0 & 19.4).
+# Konsey installer — POSIX, idempotent, sudo-free (Constitution Article 0 & 19.4).
 #
 #   ./install.sh [--quick] [--no-init] [--locale LANG] [--prefix DIR] [--python PY]
 #
@@ -68,7 +68,7 @@ case "$OS_NAME" in
         warn "Native Windows detected. Use WSL2 for a supported install; install.ps1 redirects there." ;;
     *)       PLATFORM="unknown"; warn "Unrecognized OS '$OS_NAME' — proceeding best-effort." ;;
 esac
-say "== Council installer =="
+say "== Konsey installer =="
 say "   repo     : $REPO_ROOT"
 say "   platform : $PLATFORM ($OS_NAME)"
 
@@ -238,7 +238,7 @@ say "   council  : $RUN_COUNCIL"
 
 # --- 5. Bootstrap (Article 0) -------------------------------------------------
 if [ "$DO_INIT" -eq 1 ]; then
-    say "-- council init (Article 0 Bootstrap)"
+    say "-- konsey init (Article 0 Bootstrap)"
     if [ -n "$LOCALE" ]; then
         export KONSEY_LOCALE="$LOCALE"            # honored even in a piped (non-TTY) run
         INIT_FLAGS="$INIT_FLAGS --locale $LOCALE"
@@ -272,7 +272,7 @@ for c in konsey council; do
 done
 
 # (c) doctor is an ADVISORY health report — its exit code NEVER gates install success.
-say "-- council doctor (advisory health report; does not gate install)"
+say "-- konsey doctor (advisory health report; does not gate install)"
 DOCTOR_RC=0
 # shellcheck disable=SC2086
 $RUN_COUNCIL doctor || DOCTOR_RC=$?

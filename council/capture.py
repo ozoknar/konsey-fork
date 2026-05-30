@@ -89,7 +89,7 @@ def _regime_plugin_path(cfg: Config) -> Path | None:
     """Locate the active regime plugin. ``standard`` → no plugin (secret-only gate).
 
     Resolution order (first match wins):
-      1. ``$COUNCIL_REGIME_FILE`` (explicit override)
+      1. ``$KONSEY_REGIME_FILE`` (preferred) or ``$COUNCIL_REGIME_FILE`` (deprecated) override
       2. ``<council_home>/regimes/{data_regime}.toml`` (operator-installed plugin)
       3. shipped sample under ``<council_home>/examples/regimes/`` whose ``regime``
          field equals the active regime (the sample is named by its domain, e.g.
@@ -98,7 +98,7 @@ def _regime_plugin_path(cfg: Config) -> Path | None:
     regime = (cfg.data_regime or "standard").strip().lower()
     if regime in ("", "standard"):
         return None
-    env = os.environ.get("COUNCIL_REGIME_FILE")
+    env = os.environ.get("KONSEY_REGIME_FILE") or os.environ.get("COUNCIL_REGIME_FILE")
     if env:
         p = Path(env).expanduser()
         return p if p.exists() else None

@@ -51,6 +51,7 @@
   "cli.config.set_usage": "kullanım: council config set <key> <value>",
   "cli.config.unknown_key": "bilinmeyen anahtar: {key}",
   "cli.config.usage": "kullanım: council config {get|set|path|edit}",
+  "cli.council_deprecated": "not: 'council' artık kullanımdan kalkan bir takma ad — 'konsey' kanonik komut (ikisi de çalışır).",
   "cli.doctor.agent_disabled": "ajan {name}: devre dışı (atlandı)",
   "cli.doctor.agent_not_on_path": "ajan {name}: '{cli}' CLI'ı PATH'te değil",
   "cli.doctor.agent_runnable": "ajan {name}: '{cli}' çalıştırılabilir ({path})",

@@ -50,7 +50,7 @@ def _default_extra_path() -> str:
 
 def _default_council_home() -> Path:
     """Repo root = script-relative (Article 0.2). ``config.py`` lives in ``council/``."""
-    env = os.environ.get("COUNCIL_HOME")
+    env = os.environ.get("KONSEY_HOME") or os.environ.get("COUNCIL_HOME")
     if env:
         return Path(env).expanduser().resolve()
     return Path(__file__).resolve().parent.parent
@@ -189,7 +189,7 @@ def load_config(path: str | os.PathLike[str] | None = None) -> Config:
 
     Resolution order for the config file:
       1. explicit ``path`` argument
-      2. ``$COUNCIL_CONFIG`` env var
+      2. ``$KONSEY_CONFIG`` (preferred) or ``$COUNCIL_CONFIG`` (deprecated) env var
       3. ``<council_home>/council.local.toml``
     Unknown keys are ignored. Parse/IO errors degrade to defaults (fail-open on
     *config*, never on the security gate — that lives in gateway.py)."""
@@ -198,8 +198,8 @@ def load_config(path: str | os.PathLike[str] | None = None) -> Config:
     home = _default_council_home()
     if path is not None:
         cfg_file: Path | None = Path(path).expanduser()
-    elif os.environ.get("COUNCIL_CONFIG"):
-        cfg_file = Path(os.environ["COUNCIL_CONFIG"]).expanduser()
+    elif os.environ.get("KONSEY_CONFIG") or os.environ.get("COUNCIL_CONFIG"):
+        cfg_file = Path(os.environ.get("KONSEY_CONFIG") or os.environ["COUNCIL_CONFIG"]).expanduser()
     else:
         cfg_file = home / _CONFIG_FILENAME
 

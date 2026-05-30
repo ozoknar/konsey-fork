@@ -54,7 +54,7 @@ PREFLIGHT → PLAN → CRITIQUE → SYNTHESIZE → EXECUTE → VERIFY → DECIDE
 - **REPORT / MEMORY** — özet + yalnız-ekleme audit + distilasyon.
 
 Değişmezler: üreten ≠ doğrulayan; duvar-saati ve ardışık-araç-hatası eşiğiyle sınırlı
-bir kill switch (`council stop` her an manuel tetikler).
+bir kill switch (`konsey stop` her an manuel tetikler).
 
 ## 4. Mimari
 
@@ -88,9 +88,9 @@ zamanında `cfg.by_role()` ile `cfg.verifier(exclude=...)` üzerinden atanır; h
 ## 5. Kurulum
 
 ```bash
-git clone <repo> council && cd council
+git clone <repo> konsey && cd konsey
 ./install.sh            # OS tespit eder, dep'leri pinler, Madde-0 Bootstrap'ı çalıştırır
-council doctor          # KANITLAR: hangi sağlayıcı CLI'ları gerçekten PATH'te
+konsey doctor           # KANITLAR: hangi sağlayıcı CLI'ları gerçekten PATH'te
 ```
 
 Alternatif (izole ortam, sistem Python'ını kirletmez):
@@ -114,18 +114,18 @@ pipx install konsey-cli
 ## 6. Kullanım
 
 ```bash
-council run "X'i refactor et ve testlerin hâlâ geçtiğini kanıtla"
-council run "Bu tasarım dokümanını denetle" --project myrepo --dry-run
-council doctor                # kanıt-temelli sağlık: hangi CLI çözülüyor, DB yaz/rollback
-council audit                 # yalnız-ekleme kaydını gözden geçir (salt-okunur)
-council init                  # kendini-yapılandıran Bootstrap'ı (yeniden) çalıştır
+konsey run "X'i refactor et ve testlerin hâlâ geçtiğini kanıtla"
+konsey run "Bu tasarım dokümanını denetle" --project myrepo --dry-run
+konsey doctor                 # kanıt-temelli sağlık: hangi CLI çözülüyor, DB yaz/rollback
+konsey audit                  # yalnız-ekleme kaydını gözden geçir (salt-okunur)
+konsey init                   # kendini-yapılandıran Bootstrap'ı (yeniden) çalıştır
 ```
 
-`konsey …`, `council …` komutunun korunan bir alias'ıdır ve birebir aynı çalışır (yardım başlığı ve `--version` hangi adı çağırdıysanız onu yansıtır).
+`council …`, `konsey …` komutunun **kullanımdan kalkan** ama tam çalışan alias'ıdır (yardım başlığı ve `--version` hangi adı çağırdıysanız onu yansıtır; terminalde `council` çağırınca `konsey`'e yönlendiren tek satırlık bir not basılır).
 
 > Yukarıdaki tüm alt-komutlar (`init` / `doctor` / `run` / `status` / `audit` /
 > `config` / `agents` / `enable` / `stop` / `uninstall`) bugün bağlı ve
-> çalıştırılabilir — `council --help` ile doğrulayın. Hangi platformda neyin denendiği
+> çalıştırılabilir — `konsey --help` ile doğrulayın. Hangi platformda neyin denendiği
 > için bkz. [Olgunluk](#9-durum--olgunluk).
 
 ## 7. Yapılandırma
@@ -202,7 +202,7 @@ yalnız-ekleme) bir profil veya oturum tarafından *sıkılaştırılabilir*, as
   plan otomasyonu opt-in ve **varsayılan KAPALI**.
 
 Bu README, kodun bugün sağladığından fazlasını iddia etmez; makinenizdeki canlı,
-kanıt-temelli durum için `council doctor` çalıştırın, ertelenen kalemler için
+kanıt-temelli durum için `konsey doctor` çalıştırın, ertelenen kalemler için
 [`KNOWN_ISSUES.md`](./KNOWN_ISSUES.md).
 
 ## 10. Gizlilik & güvenlik

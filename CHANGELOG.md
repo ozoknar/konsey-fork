@@ -12,6 +12,23 @@ unverified "it works" claims. Test evidence is cited where it backs an entry.
 
 ### Added
 
+- **Naming flip (S0) — `konsey` is now CANONICAL, `council` a deprecated alias.**
+  The command, brand, docs, and install output lead with `konsey`; `_prog_name()`
+  now falls back to `konsey` for `python -m`/test invocations. `council` keeps
+  working identically, but invoking it on an interactive terminal prints one
+  non-fatal stderr nudge (`cli.council_deprecated`, en/tr) — silent on `konsey`,
+  on pipes/scripts, and on `python -m` so captured output, CI, and the
+  install-time probes stay clean. `KONSEY_*` env vars are now PREFERRED over
+  `COUNCIL_*` (each `COUNCIL_*` var still works as a deprecated fallback):
+  `KONSEY_HOME`, `KONSEY_CONFIG`, `KONSEY_REGIME_FILE`, `KONSEY_SECRETS_FILE`
+  (joining the already-preferred `KONSEY_DATA_HOME`/`KONSEY_LOCALE`/`KONSEY_EXEC`/
+  `KONSEY_REPAIR`). **Deliberately NOT renamed** (high-churn + live-user-data
+  migration, deferred): the internal Python package `council/`, the
+  `council.local.toml` filename, the DuckDB tables, and `cfg.council_home` — a CLI
+  name differing from its internal package name is standard and breaks nothing.
+  11 new tests assert konsey-first + full `COUNCIL_*` backward-compat + the
+  TTY-gated notice; en/tr key parity preserved.
+
 - **De-domestication — regimes + locales are now DISCOVERED, not hardcoded to TR/EU/US.**
   The core was region-neutral by design but strangled by allowlists: `gateway._REGULATED_REGIMES
   = {kvkk,gdpr,hipaa}` (gated the generic pack loader at 3 sites), `cli._REGIMES`/`_LOCALES`

@@ -1249,11 +1249,27 @@ def cmd_uninstall(args: argparse.Namespace) -> int:
 
 
 def _prog_name() -> str:
-    """The command name actually invoked (``council`` or its working alias ``konsey``),
-    so help/usage/--version reflect what the user typed. Falls back to ``council`` for
-    ``python -m`` / test invocations."""
+    """The command name actually invoked (``konsey`` or its deprecated alias ``council``),
+    so help/usage/--version reflect what the user typed. Falls back to ``konsey`` for
+    ``python -m`` / test invocations (konsey is canonical as of S0)."""
     name = Path(sys.argv[0]).name
-    return name if name in ("council", "konsey") else "council"
+    return name if name in ("council", "konsey") else "konsey"
+
+
+def _maybe_deprecation_notice() -> None:
+    """``konsey`` is the canonical command; ``council`` is a kept-working but DEPRECATED
+    alias (S0). When the user ACTUALLY typed ``council`` on an interactive terminal, print
+    one non-fatal stderr line nudging them to ``konsey``. Stays silent on ``konsey``, on
+    pipes/scripts (stderr not a TTY), and on ``python -m`` / test invocations — so captured
+    output, CI, and the install-time probes never see it."""
+    if Path(sys.argv[0]).name != "council":
+        return
+    if not (sys.stderr and sys.stderr.isatty()):
+        return
+    try:
+        _err(t(load_catalog(load_config()), "cli.council_deprecated"))
+    except Exception:
+        _err("note: 'council' is a deprecated alias — 'konsey' is now the canonical command.")
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -1334,6 +1350,7 @@ def build_parser() -> argparse.ArgumentParser:
 
 def main(argv: list[str] | None = None) -> int:
     argv = sys.argv[1:] if argv is None else argv
+    _maybe_deprecation_notice()
     parser = build_parser()
     args = parser.parse_args(argv)
     if not getattr(args, "cmd", None):

@@ -115,7 +115,7 @@ class EnvFileStore(SecretStore):
     name = "envfile"
 
     def __init__(self, path: str | os.PathLike[str] | None = None) -> None:
-        env = path or os.environ.get("COUNCIL_SECRETS_FILE")
+        env = path or os.environ.get("KONSEY_SECRETS_FILE") or os.environ.get("COUNCIL_SECRETS_FILE")
         self._path = Path(env).expanduser() if env else (
             Path.home() / ".config" / "council" / "secrets.env"
         )

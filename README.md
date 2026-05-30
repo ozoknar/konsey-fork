@@ -1,4 +1,4 @@
-# Council
+# Konsey
 
 **English** · [Türkçe](./README.tr.md)
 
@@ -51,7 +51,7 @@ PREFLIGHT → PLAN → CRITIQUE → SYNTHESIZE → EXECUTE → VERIFY → DECIDE
 - **REPORT / MEMORY** — summary + append-only audit + distillation.
 
 Invariants: producer ≠ verifier; a kill switch bounded by wall-time and a
-consecutive-tool-failure cap (`council stop` triggers it manually at any time).
+consecutive-tool-failure cap (`konsey stop` triggers it manually at any time).
 
 ## 4. Architecture
 
@@ -85,9 +85,9 @@ module hard-codes a brand name, a path, a project name, or an owner identity.
 ## 5. Install
 
 ```bash
-git clone <repo> council && cd council
+git clone <repo> konsey && cd konsey
 ./install.sh            # detects OS, pins deps, runs the Article-0 Bootstrap
-council doctor          # PROVES which provider CLIs are actually on PATH
+konsey doctor           # PROVES which provider CLIs are actually on PATH
 ```
 
 Alternative (isolated environment, does not pollute system Python):
@@ -102,7 +102,7 @@ pipx install konsey-cli
   *not* claimed, only what was verified).
 - You need **at least one** provider CLI (`claude` / `codex` / `agy`); the rest
   degrade gracefully.
-- **Cross-validation needs ≥ 2 independent providers.** With a single provider Council
+- **Cross-validation needs ≥ 2 independent providers.** With a single provider konsey
   runs in *advisory mode*: confidence is capped at `0.6` and output is stamped
   "unverified". The third node — `agy` (Google Antigravity) — is **optional** and
   harder to install; most setups run 1–2 providers. This is an honest default, not a
@@ -111,18 +111,18 @@ pipx install konsey-cli
 ## 6. Usage
 
 ```bash
-council run "Refactor X and prove the tests still pass"
-council run "Audit this design doc" --project myrepo --dry-run
-council doctor                # evidence-based health: which CLIs resolve, DB write/rollback
-council audit                 # browse the append-only log (read-only)
-council init                  # (re)run the self-configuring Bootstrap
+konsey run "Refactor X and prove the tests still pass"
+konsey run "Audit this design doc" --project myrepo --dry-run
+konsey doctor                 # evidence-based health: which CLIs resolve, DB write/rollback
+konsey audit                  # browse the append-only log (read-only)
+konsey init                   # (re)run the self-configuring Bootstrap
 ```
 
-`konsey …` is a maintained alias of `council …` and behaves identically (the help banner and `--version` reflect whichever name you invoke).
+`council …` is a **deprecated** but fully-working alias of `konsey …` (the help banner and `--version` reflect whichever name you invoke; calling `council` on a terminal prints a one-line nudge toward `konsey`).
 
 > All subcommands above (`init` / `doctor` / `run` / `status` / `audit` / `config` /
 > `agents` / `enable` / `stop` / `uninstall`) are wired and runnable today — verify with
-> `council --help`. See [Maturity](#9-status--maturity) for what has been exercised on
+> `konsey --help`. See [Maturity](#9-status--maturity) for what has been exercised on
 > which platform.
 
 ## 7. Configuration
@@ -198,7 +198,7 @@ ceiling/floor, append-only) can be *tightened* by a profile or session, never
   automation is opt-in and **default OFF**.
 
 This README does not claim more than the code currently delivers; check
-`council doctor` for the live, evidence-based status on your machine, and
+`konsey doctor` for the live, evidence-based status on your machine, and
 [`KNOWN_ISSUES.md`](./KNOWN_ISSUES.md) for the deferred items.
 
 ## 10. Privacy & security

@@ -51,6 +51,7 @@
   "cli.config.set_usage": "usage: council config set <key> <value>",
   "cli.config.unknown_key": "unknown key: {key}",
   "cli.config.usage": "usage: council config {get|set|path|edit}",
+  "cli.council_deprecated": "note: 'council' is a deprecated alias — 'konsey' is now the canonical command (both still work).",
   "cli.doctor.agent_disabled": "agent {name}: disabled (skipped)",
   "cli.doctor.agent_not_on_path": "agent {name}: CLI '{cli}' not on PATH",
   "cli.doctor.agent_runnable": "agent {name}: '{cli}' runnable ({path})",

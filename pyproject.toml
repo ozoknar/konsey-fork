@@ -36,8 +36,8 @@ dev = [
 ]
 
 [project.scripts]
-council = "council.cli:main"
-konsey = "council.cli:main"   # working alias; `council` stays canonical (brand-neutral)
+konsey = "council.cli:main"    # canonical command (S0: konsey is now the primary name)
+council = "council.cli:main"   # deprecated alias — kept fully working; prints a one-line notice on a TTY
 
 [project.urls]
 Homepage = "https://github.com/OWNER/konsey"
