@@ -10,6 +10,15 @@ unverified "it works" claims. Test evidence is cited where it backs an entry.
 
 ## [Unreleased] — Phase 2 (in progress)
 
+### Removed
+
+- **Dead `council/run.py` module (tech-debt; autonomous cycle 2).** A vestigial headless
+  entry that duplicated `cli.py::cmd_run` (the real `konsey run` handler). It had no
+  console-script entry (pyproject wires only `council.cli:main`), no importer, no test,
+  and no doc reference — a whole-project council eval flagged it as a duplicate with its
+  own entry path that packaging never pointed at. Removed; `konsey run` is unaffected (full
+  suite green, no test referenced it).
+
 ### Changed
 
 - **Honesty pass (S8) — docs match reality (Constitution Art. 2.1).** A whole-project
