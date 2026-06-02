@@ -120,6 +120,21 @@
 
 ## Resolved in Phase 2 (moved out of the backlog above — fixed + verified)
 
+- **`providers_ok` mis-counted cross-provider quorum (was: "only claude completes, codex+agy
+  time out").** Symptom: three consecutive runs all reported `providers_ok=1` and a "claude
+  (1 tamam)" node line, making the 3-agent quorum look unreachable. **Root cause — NOT a
+  timeout/auth/isolation failure.** The audited evidence proved codex *and* agy/google both
+  ran to success (`ok=true`, codex 5–41s, google 9–19s, all well under the effective 360s
+  per-call deadline in `graph._ask`). The bug was purely a counter: `graph.plan()` set
+  `providers_ok` to the number of *leads that produced a plan* in the single PLAN node, so a
+  one-lead roster (claude lead, codex critic, agy verifier) was structurally capped at 1 even
+  when the critic and verifier both contributed. Fix: `graph._distinct_providers_ok(s)` now
+  counts the DISTINCT providers with a successful `terminal_exit` evidence row across the whole
+  run; `decide_node` uses it for `n_providers_ok`/`agreement` and writes it back into state,
+  and the report node lists every participating provider. Verified live: `konsey run` →
+  `providers_ok=3`, node line "claude, codex, google (3 tamam)", confidence 0.75→0.85.
+  Regression: `tests/test_graph_orchestration.py` asserts `providers_ok == 3` on the full roster.
+
 - **Regime term-file fail-open now warns (was Phase 2 in this file).** `council doctor`
   emits a visible `⚠` when a regulated regime (`kvkk` / `gdpr` / `hipaa`) is set but its
   `regimes/*.toml` term file did not load — clinical/identity detection OFF, secret scan

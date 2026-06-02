@@ -136,6 +136,25 @@ def _first(names: list[str], avail: dict[str, bool]) -> str | None:
     return None
 
 
+def _distinct_providers_ok(s: S) -> int:
+    """How many DISTINCT providers produced at least one successful (ok) evidence row
+    across the whole run — the true cross-provider participation count (quorum signal).
+
+    ``plan.providers_ok`` only counts *leads that planned* in the single plan() node, so
+    with a one-lead roster it is structurally capped at 1 even when the critic (codex) and
+    verifier (agy/google) both ran and succeeded. The quorum the owner rule cares about is
+    "how many independent providers actually contributed verified output", which is exactly
+    the set of distinct ``terminal_exit`` evidence agents with ``ok=True`` (claude+codex+
+    google → 3). Counted from evidence so it stays correct regardless of roster role split."""
+    seen: set[str] = set()
+    for ev in s.get("evidence", []) or ():
+        if ev.get("ok") and ev.get("agent"):
+            seen.add(ev["agent"])
+    # Never report fewer than the lead-plan count already threaded through state (defensive:
+    # a stub/test path may set providers_ok without emitting per-agent evidence rows).
+    return max(len(seen), s.get("providers_ok", 0))
+
+
 # ---------- STATES ----------
 def preflight(s: S, cfg: Config) -> dict:
     gw = gw_preflight(s["task"], s.get("project_hint", ""), cfg)
@@ -395,12 +414,13 @@ def decide_node(s: S, cfg: Config) -> dict:
         audit.decision(sid, "ABORTED: " + dead_rationale, 0.0, [], [], False, cfg=cfg)
         return {"decision": {"confidence": 0.0, "human_required": True, "rationale": dead_rationale}}
     n_cross = 1 if s.get("verify_ok") else 0
+    prov_ok = _distinct_providers_ok(s)
     dec = decide(
         risk=s.get("risk", "internal"),
-        n_providers_ok=s.get("providers_ok", 0),
+        n_providers_ok=prov_ok,
         n_evidence=len(s.get("evidence", [])),
         n_crossverified=n_cross,
-        agreement=s.get("providers_ok", 0) >= 2,
+        agreement=prov_ok >= 2,
         unresolved_dissent=len(s.get("dissents", [])),
         tool_failures=s.get("tool_failures", 0),
         confidence_floor=cfg.confidence_floor,
@@ -419,7 +439,10 @@ def decide_node(s: S, cfg: Config) -> dict:
                    list(s.get("evidence", [])), list(s.get("dissents", [])),
                    human_approved=False, cfg=cfg)
     return {"decision": {"confidence": dec.confidence, "human_required": human_required,
-                         "rationale": rationale}}
+                         "rationale": rationale},
+            # Overwrite the lead-only plan count with the true cross-provider participation
+            # count so the run output / report / quorum check see all providers that ran.
+            "providers_ok": prov_ok}
 
 
 def report(s: S, cfg: Config) -> dict:
@@ -442,8 +465,13 @@ def report(s: S, cfg: Config) -> dict:
     if s.get("exec_needs_human") and not _dead(s):
         lines += [t(cat, "report.exec_gate"), ""]
     if not _dead(s):
+        # All DISTINCT providers that produced successful evidence (lead+critic+verifier),
+        # not just the plan() leads — otherwise a one-lead roster always reads "claude (1)".
+        ran = list(dict.fromkeys(
+            ev["agent"] for ev in s.get("evidence", []) or ()
+            if ev.get("ok") and ev.get("agent"))) or list(s.get("plans", {}).keys())
         lines += [
-            t(cat, "report.nodes", names=", ".join(s.get("plans", {}).keys()),
+            t(cat, "report.nodes", names=", ".join(ran),
               n=s.get("providers_ok", 0)),
             "",
             t(cat, "report.final_output"), (s.get("execution") or "")[:3000], "",

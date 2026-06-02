@@ -71,7 +71,10 @@ def test_full_loop_with_cross_verification_reaches_a_decision(tmp_path, monkeypa
     final = _run(cfg)
     assert final.get("report")                          # REPORT state produced output
     assert "confidence" in final.get("decision", {})    # DECIDE produced a real decision
-    assert final.get("providers_ok", 0) >= 1
+    # Quorum: ALL three distinct providers ran successfully (lead+critic+verifier), so the
+    # cross-provider participation count must be 3 — NOT 1 (the old lead-only plan count,
+    # which structurally capped a one-lead roster at 1 even when codex+agy both succeeded).
+    assert final.get("providers_ok", 0) == 3
     assert not final.get("advisory")                    # 2+ providers + cross-verify → not advisory
     assert final.get("verify_ok") is True               # the verifier returned PASS
     # producer ≠ verifier: the executor is the lead (claude); the verifier must differ.
