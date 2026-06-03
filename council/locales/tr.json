@@ -264,5 +264,12 @@
   "report.rationale": "- gerekçe: {rationale}",
   "report.title": "# Konsey Raporu — {task}",
   "report.verification": "## Doğrulama\n{verdict}",
-  "report.verification_none": "(yok)"
+  "report.verification_none": "(yok)",
+  "cli.factory.header": "Yapay Zeka Ajan Fabrikası Genel Görünümü\n",
+  "cli.factory.isolation_status": "  izolasyon durumu  : {sandbox} (host yapılandırma sızıntı kalıtımı: {inherit})",
+  "cli.factory.mapping_header": "\n  Ajan Fabrikası Rol Eşleşmesi:",
+  "cli.factory.mapping_line": "    {factory_role:<25} ({roster_role:<10}) -> Etkin: {providers}",
+  "cli.factory.host_leaks_header": "\n  Proaktif Host Yapılandırma Sızıntıları (Keşif bulguları):",
+  "cli.factory.host_leak_item": "    {mark} {label} '{node}' düğümüne sızar: {path}",
+  "cli.factory.host_clean": "    ✓ Host yapılandırma sızıntısı saptanmadı."
 }

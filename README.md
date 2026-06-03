@@ -84,6 +84,16 @@ consecutive-tool-failure cap (`konsey stop` triggers it manually at any time).
 providers at run time via `cfg.by_role()` and `cfg.verifier(exclude=...)`; no core
 module hard-codes a brand name, a path, a project name, or an owner identity.
 
+### 4.1 The Agent Factory Pattern
+Council maps directly to an autonomous, pro-active **Agent Factory** (Yapay Zeka Ajan Organizasyonu) model:
+- **Director Agent:** Triggers preflight risk check and initial parallel planning (Preflight + Plan nodes).
+- **Coordinator Agent:** Manages transitions, budgets, and state constraints via LangGraph (`graph.py`).
+- **Scout Agent:** Proactively scans files, dependencies, and configuration leakage warnings (`isolation.py`).
+- **Builder/Coder Agent:** Executes development tasks within an isolated, bounded Git worktree (`execute.py`).
+- **QA & Security Agent:** Conducts cross-provider verification and enforces strict command denylists (`verify.py` + `exec_policy.py`).
+
+For a detailed breakdown of the roles, security layers, and autonomous workflows, see the [Agent Factory Architecture Guide](./docs/AGENT_FACTORY.md).
+
 ## 5. Install
 
 ```bash

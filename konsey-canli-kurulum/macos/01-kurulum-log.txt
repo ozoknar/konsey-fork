@@ -1,0 +1,83 @@
+== Konsey installer ==
+   repo     : /tmp/konsey-mac-sandbox
+   platform : macos (Darwin)
+
+[1/6] Preflight — OS & toolchain
+
+[2/6] Python — locate an interpreter >= 3.12
+   python   : python3.14 (3.14.5)
+   note     : Python 3.14 is newer than the CI baseline (3.12). It is expected
+              to work, but CI is pinned to 3.12 — if anything looks off, reproduce on
+              3.12 before filing.
+
+[3/6] Virtualenv — isolated .venv (never touches system Python)
+-- creating virtualenv: /tmp/konsey-mac-sandbox/.venv
+
+[4/6] Dependencies — pinned requirements + editable package
+-- upgrading pip (quiet)
+   -- Installing pinned dependencies ... [OK]
+   -- Installing konsey (editable) ... [OK]
+
+[5/6] Link & init — console-scripts on PATH + Bootstrap
+   linked   : /tmp/konsey-mac-sandbox/bin/council -> /tmp/konsey-mac-sandbox/.venv/bin/council
+   linked   : /tmp/konsey-mac-sandbox/bin/konsey -> /tmp/konsey-mac-sandbox/.venv/bin/konsey
+!! /tmp/konsey-mac-sandbox/bin is not on your PATH. Add it (zsh):
+    echo 'export PATH="/tmp/konsey-mac-sandbox/bin:$PATH"' >> ~/.zshrc && exec zsh
+  (bash users: append the same line to ~/.bashrc)
+   council  : /tmp/konsey-mac-sandbox/.venv/bin/council
+-- konsey init (Article 0 Bootstrap)
+Konsey önyüklemesi (Madde 0) — otomatik-tespit + onay.
+  council_home : /private/tmp/konsey-mac-sandbox
+  data_home    : /Users/homemini/.local/share/council
+  os           : Darwin
+
+PATH'teki sağlayıcı CLI'ları:
+  ✓ claude   (claude)
+  ✓ codex    (codex)
+  ✓ google   (agy)
+
+Yazıldı (her yol listelendi; gizli yan etki yok):
+  /private/tmp/konsey-mac-sandbox/council.local.toml
+  /Users/homemini/.local/share/council
+  /Users/homemini/.local/share/council/logs
+  /Users/homemini/.local/share/council/sessions
+
+Host AI-yapılandırma taraması (Madde 2.6 — düğüm izolasyonu):
+  ! global Claude memory → 'claude' düğümüne sızar: /Users/homemini/.claude/CLAUDE.md
+  ! global Claude settings/hooks → 'claude' düğümüne sızar: /Users/homemini/.claude/settings.json
+  ! global Codex instructions → 'codex' düğümüne sızar: /Users/homemini/.codex/AGENTS.md
+  ! global Codex config → 'codex' düğümüne sızar: /Users/homemini/.codex/config.toml
+  ! global Gemini settings → 'google' düğümüne sızar: /Users/homemini/.gemini/antigravity-cli/settings.json
+  not: bu dosyalar DEĞİŞTİRİLMEZ; bugün bir düğüme sızarlar — izolasyon şimdilik yalnız tespit aşamasında, enforcement planlı (KNOWN_ISSUES.md: node-isolation).
+
+Profil yazıldı:
+  duruş=balanced · sahip=operator · dil=tr · rejim=standard
+  kadro (etkin): claude(lead) codex(critic) google(verifier)
+  yürütme  : gerçek-iş OFF — `konsey do` çalışma-anında kilitli kalır (KONSEY_EXEC + onay)
+
+Hiçbir arka plan hizmeti kurulmadı. Otomasyon isteğe bağlıdır:
+  council enable capture   (onay + PHI/sır geçidi açıklanır)
+Sonraki: `council doctor` hangi sağlayıcıların gerçekten erişilebilir olduğunu kanıtlar.
+
+[6/6] Verify — install success vs provider health
+-- konsey doctor (advisory health report; does not gate install)
+council doctor — kanıt-temelli sağlık kontrolü
+
+  ✓ config: /private/tmp/konsey-mac-sandbox/council.local.toml (mevcut)
+  ✓ owner: 'operator'  locale: tr  regime: standard
+  ✓ ajan claude: 'claude' çalıştırılabilir (/Users/homemini/.local/bin/claude)
+  ✓ ajan codex: 'codex' çalıştırılabilir (/opt/homebrew/bin/codex)
+  ✓ ajan google: 'agy' çalıştırılabilir (/Users/homemini/.local/bin/agy)
+  ✓ duckdb: INSERT/SELECT/ROLLBACK doğrulandı
+  ✓ denetim koruması: sorgu yardımcısı mevcut (tam kontrol test paketinde)
+  ✓ sır geçidi: sk-ant örneğini yakalar, placeholder'ı yok sayar (Madde 4.2)
+  ✓ graph: build() + adapters.adapter_for içe aktarılabilir
+  ⚠ düğüm izolasyonu: 5 host AI-yapılandırma dosyası sağlayıcı düğümlerine sızar (claude:2 codex:2 google:1) — çapraz-sağlayıcı bağımsızlığı (Madde 2.2) adapter izolasyonu gelene kadar risk altında; bkz. KNOWN_ISSUES.md (node-isolation).
+
+✓ Tüm kontroller geçti.
+
++----------------------------------------------------------------------+
+| Install complete — konsey and council are installed.
+| Open a new shell (or run the PATH export above), then:  konsey doctor
++----------------------------------------------------------------------+
+[OK] doctor: health checks passed (advisory vs full mode in the report above).

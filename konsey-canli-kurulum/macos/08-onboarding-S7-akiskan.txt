@@ -1,0 +1,56 @@
+
+Welcome to konsey — a multi-agent council that distributes BOTH the work and the
+decision across your AI CLIs, evidence-weighted and append-only-audited. This sets up a
+local profile (language · posture · owner · optional data regime) in ~30s. Nothing leaves
+this machine; re-run `konsey init --reconfigure` any time.
+Dil / Language ar|de|en|es|fr|tr [en]: en
+  ✓ language: en
+Council bootstrap (Article 0) — auto-detect + confirm.
+  council_home : /private/tmp/iwiz2
+  data_home    : /private/tmp/iwiz2/d
+  os           : Darwin
+
+Posture — how much konsey may touch your system (changeable later via `konsey config set preset`):
+  advisory   : one provider, read-only — recommend, never write.
+  balanced   : full council, no autonomous writes (safe default).
+  autonomous : full council + execution ARMED to read-only — `konsey do` still needs an
+               explicit KONSEY_EXEC + confirm; NO posture ever grants a blind write.
+Posture advisory|balanced|autonomous [balanced]: balanced
+  posture: balanced
+
+Provider CLIs on PATH:
+  ✓ claude   (claude)
+  ✓ codex    (codex)
+  ✓ google   (agy)
+Owner label (NOT your username) [operator]: radyolog
+  ✓ owner: radyolog
+
+Data regime — a detection AID for clinical/identity terms, NOT a legal-compliance
+guarantee (Article 4.3); liability stays with you. Press Enter for 'standard'.
+Data regime standard [standard]: 
+
+Wrote (every path listed; no hidden side effects):
+  /private/tmp/iwiz2/council.local.toml
+  /private/tmp/iwiz2/d
+  /private/tmp/iwiz2/d/logs
+  /private/tmp/iwiz2/d/sessions
+
+Host AI-config scan (Article 2.6 — node isolation):
+  ! global Claude memory → would leak into node 'claude': /Users/homemini/.claude/CLAUDE.md
+  ! global Claude settings/hooks → would leak into node 'claude': /Users/homemini/.claude/settings.json
+  ! global Codex instructions → would leak into node 'codex': /Users/homemini/.codex/AGENTS.md
+  ! global Codex config → would leak into node 'codex': /Users/homemini/.codex/config.toml
+  ! global Gemini settings → would leak into node 'google': /Users/homemini/.gemini/antigravity-cli/settings.json
+  note: these files are NOT modified; they WOULD leak into a node today — isolation is detection-only for now, enforcement is planned (KNOWN_ISSUES.md: node-isolation).
+
+Profile written:
+  posture=balanced · owner=radyolog · locale=en · regime=standard
+  roster (enabled): claude(lead) codex(critic) google(verifier)
+  execution : real-work OFF — `konsey do` stays runtime-locked (KONSEY_EXEC + confirm)
+  audit     : append-only trail at /private/tmp/iwiz2/d/council.duckdb — browse it with `konsey audit`
+
+You're set up. Three things to try next:
+  1. konsey doctor              — prove which providers are actually reachable
+  2. konsey run "<task>"         — put the council to work (evidence-weighted, audited)
+  3. konsey enable automation    — opt in so it self-continues + recovers stalled runs
+Nothing runs in the background until you opt in (Article 14).

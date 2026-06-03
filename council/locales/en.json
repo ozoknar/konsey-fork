@@ -264,5 +264,12 @@
   "report.rationale": "- rationale: {rationale}",
   "report.title": "# Council Report — {task}",
   "report.verification": "## Verification\n{verdict}",
-  "report.verification_none": "(none)"
+  "report.verification_none": "(none)",
+  "cli.factory.header": "AI Agent Factory Overview\n",
+  "cli.factory.isolation_status": "  isolation status  : {sandbox} (host configuration inheritance: {inherit})",
+  "cli.factory.mapping_header": "\n  Agent Factory Role Mapping:",
+  "cli.factory.mapping_line": "    {factory_role:<25} ({roster_role:<10}) -> Enabled: {providers}",
+  "cli.factory.host_leaks_header": "\n  Proactive Host Configuration Leaks (Scout findings):",
+  "cli.factory.host_leak_item": "    {mark} {label} would leak into node '{node}': {path}",
+  "cli.factory.host_clean": "    ✓ No host configuration leaks detected."
 }

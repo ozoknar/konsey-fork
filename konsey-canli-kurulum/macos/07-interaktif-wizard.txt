@@ -1,0 +1,37 @@
+Dil / Language ar|de|en|es|fr|tr [en]: en
+Council bootstrap (Article 0) — auto-detect + confirm.
+  council_home : /private/tmp/iwiz
+  data_home    : /private/tmp/iwiz/d
+  os           : Darwin
+Posture advisory|balanced|autonomous [balanced]: balanced
+  posture: balanced
+
+Provider CLIs on PATH:
+  ✓ claude   (claude)
+  ✓ codex    (codex)
+  ✓ google   (agy)
+Owner label (NOT your username) [operator]: radyolog
+Data regime standard [standard]: 
+
+Wrote (every path listed; no hidden side effects):
+  /private/tmp/iwiz/council.local.toml
+  /private/tmp/iwiz/d
+  /private/tmp/iwiz/d/logs
+  /private/tmp/iwiz/d/sessions
+
+Host AI-config scan (Article 2.6 — node isolation):
+  ! global Claude memory → would leak into node 'claude': /Users/homemini/.claude/CLAUDE.md
+  ! global Claude settings/hooks → would leak into node 'claude': /Users/homemini/.claude/settings.json
+  ! global Codex instructions → would leak into node 'codex': /Users/homemini/.codex/AGENTS.md
+  ! global Codex config → would leak into node 'codex': /Users/homemini/.codex/config.toml
+  ! global Gemini settings → would leak into node 'google': /Users/homemini/.gemini/antigravity-cli/settings.json
+  note: these files are NOT modified; they WOULD leak into a node today — isolation is detection-only for now, enforcement is planned (KNOWN_ISSUES.md: node-isolation).
+
+Profile written:
+  posture=balanced · owner=radyolog · locale=en · regime=standard
+  roster (enabled): claude(lead) codex(critic) google(verifier)
+  execution : real-work OFF — `konsey do` stays runtime-locked (KONSEY_EXEC + confirm)
+
+No background service was installed. Automation is opt-in:
+  council enable capture   (consent + PHI/secret gate explained)
+Next: `council doctor` proves which providers are actually reachable.

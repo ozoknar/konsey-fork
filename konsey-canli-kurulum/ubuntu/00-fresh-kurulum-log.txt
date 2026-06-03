@@ -1,0 +1,82 @@
+== Konsey installer ==
+   repo     : /opt/konsey
+   platform : linux (Linux)
+
+[1m[36m[1/6][0m [1mPreflight — OS & toolchain[0m
+
+[1m[36m[2/6][0m [1mPython — locate an interpreter >= 3.12[0m
+   python   : python3.12 (3.12.3)
+
+[1m[36m[3/6][0m [1mVirtualenv — isolated .venv (never touches system Python)[0m
+-- creating virtualenv: /opt/konsey/.venv
+
+[1m[36m[4/6][0m [1mDependencies — pinned requirements + editable package[0m
+-- upgrading pip (quiet)
+[2m   | Installing pinned dependencies    / Installing pinned dependencies    - Installing pinned dependencies    \ Installing pinned dependencies    | Installing pinned dependencies    / Installing pinned dependencies    - Installing pinned dependencies    \ Installing pinned dependencies    | Installing pinned dependencies    / Installing pinned dependencies    - Installing pinned dependencies    \ Installing pinned dependencies    | Installing pinned dependencies    / Installing pinned dependencies    - Installing pinned dependencies    \ Installing pinned dependencies    | Installing pinned dependencies    / Installing pinned dependencies    - Installing pinned dependencies    \ Installing pinned dependencies    | Installing pinned dependencies    / Installing pinned dependencies    - Installing pinned dependencies    \ Installing pinned dependencies    | Installing pinned dependencies    / Installing pinned dependencies    - Installing pinned dependencies    \ Installing pinned dependencies    | Installing pinned dependencies    / Installing pinned dependencies    - Installing pinned dependencies    \ Installing pinned dependencies    | Installing pinned dependencies    / Installing pinned dependencies    - Installing pinned dependencies    \ Installing pinned dependencies    | Installing pinned dependencies    / Installing pinned dependencies    - Installing pinned dependencies    \ Installing pinned dependencies    | Installing pinned dependencies    / Installing pinned dependencies    - Installing pinned dependencies    \ Installing pinned dependencies    | Installing pinned dependencies    / Installing pinned dependencies    - Installing pinned dependencies    \ Installing pinned dependencies    | Installing pinned dependencies    / Installing pinned dependencies    - Installing pinned dependencies    \ Installing pinned dependencies    | Installing pinned dependencies    / Installing pinned dependencies    - Installing pinned dependencies    \ Installing pinned dependencies    | Installing pinned dependencies    / Installing pinned dependencies    - Installing pinned dependencies    \ Installing pinned dependencies    | Installing pinned dependencies    / Installing pinned dependencies    - Installing pinned dependencies    \ Installing pinned dependencies    | Installing pinned dependencies    / Installing pinned dependencies    - Installing pinned dependencies    \ Installing pinned dependencies    | Installing pinned dependencies    / Installing pinned dependencies    - Installing pinned dependencies    \ Installing pinned dependencies    | Installing pinned dependencies    / Installing pinned dependencies    - Installing pinned dependencies    \ Installing pinned dependencies    | Installing pinned dependencies    / Installing pinned dependencies    - Installing pinned dependencies    \ Installing pinned dependencies    | Installing pinned dependencies    / Installing pinned dependencies [0m   [32m[OK][0m Installing pinned dependencies
+[2m   | Installing konsey (editable)    / Installing konsey (editable)    - Installing konsey (editable)    \ Installing konsey (editable)    | Installing konsey (editable)    / Installing konsey (editable)    - Installing konsey (editable)    \ Installing konsey (editable)    | Installing konsey (editable)    / Installing konsey (editable)    - Installing konsey (editable)    \ Installing konsey (editable)    | Installing konsey (editable)    / Installing konsey (editable)    - Installing konsey (editable)    \ Installing konsey (editable)    | Installing konsey (editable)    / Installing konsey (editable)    - Installing konsey (editable)    \ Installing konsey (editable)    | Installing konsey (editable) [0m   [32m[OK][0m Installing konsey (editable)
+
+[1m[36m[5/6][0m [1mLink & init — console-scripts on PATH + Bootstrap[0m
+   linked   : /root/.local/bin/council -> /opt/konsey/.venv/bin/council
+   linked   : /root/.local/bin/konsey -> /opt/konsey/.venv/bin/konsey
+[33m!! /root/.local/bin is not on your PATH. Add it (zsh):[0m
+    echo 'export PATH="/root/.local/bin:$PATH"' >> ~/.zshrc && exec zsh
+  (bash users: append the same line to ~/.bashrc)
+   council  : /opt/konsey/.venv/bin/council
+-- konsey init (Article 0 Bootstrap)
+note: 'council' is a deprecated alias — 'konsey' is now the canonical command (both still work).
+Council bootstrap (Article 0) — auto-detect + confirm.
+  council_home : /opt/konsey
+  data_home    : /root/.local/share/council
+  os           : Linux
+
+Provider CLIs on PATH:
+  ✗ claude   (claude)
+  ✗ codex    (codex)
+  ✗ google   (agy)
+
+  ! Fewer than 2 providers detected. Council runs in ADVISORY mode:
+    cross-verification is disabled, confidence is capped at 0.6, and
+    output is marked 'unverified'. This is a fully supported, honest default.
+
+Wrote (every path listed; no hidden side effects):
+  /opt/konsey/council.local.toml
+  /root/.local/share/council
+  /root/.local/share/council/logs
+  /root/.local/share/council/sessions
+
+Host AI-config scan (Article 2.6 — node isolation):
+  no host AI-config detected that would leak into a node.
+
+Profile written:
+  posture=balanced · owner=operator · locale=en · regime=standard
+  roster (enabled): —
+  execution : real-work OFF — `konsey do` stays runtime-locked (KONSEY_EXEC + confirm)
+
+No background service was installed. Automation is opt-in:
+  council enable capture   (consent + PHI/secret gate explained)
+Next: `council doctor` proves which providers are actually reachable.
+
+[1m[36m[6/6][0m [1mVerify — install success vs provider health[0m
+-- konsey doctor (advisory health report; does not gate install)
+note: 'council' is a deprecated alias — 'konsey' is now the canonical command (both still work).
+council doctor — evidence-based health check
+
+  ✓ config: /opt/konsey/council.local.toml (present)
+  ✓ owner: 'operator'  locale: en  regime: standard
+  ✓ agent claude: disabled (skipped)
+  ✓ agent codex: disabled (skipped)
+  ✓ agent google: disabled (skipped)
+  ⚠ 0 providers runnable — council CANNOT run tasks yet; install at least one CLI (e.g. claude / codex / gemini) and re-run `council doctor`. (advisory mode)
+  ✓ duckdb: INSERT/SELECT/ROLLBACK verified
+  ✓ audit guard: query helper present (full check in test suite)
+  ✓ secret gate: catches sk-ant sample, ignores placeholder (Article 4.2)
+  ✓ graph: build() + adapters.adapter_for importable
+  ✓ node isolation: no host AI-config detected that would leak into a node (Article 2.6)
+
+✓ All checks passed — advisory mode (no provider CLI yet; install one to run tasks).
+
+[32m+----------------------------------------------------------------------+[0m
+[32m|[0m [1mInstall complete[0m — konsey and council are installed.
+[32m|[0m Open a new shell (or run the PATH export above), then:  konsey doctor
+[32m+----------------------------------------------------------------------+[0m
+[32m[OK][0m doctor: health checks passed (advisory vs full mode in the report above).

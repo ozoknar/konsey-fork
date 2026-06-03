@@ -87,6 +87,17 @@ bir kill switch (`konsey stop` her an manuel tetikler).
 zamanında `cfg.by_role()` ile `cfg.verifier(exclude=...)` üzerinden atanır; hiçbir
 çekirdek modül marka adını, yolu, proje adını veya sahip kimliğini gömmez.
 
+### 4.1 Ajan Fabrikası Modeli
+Konsey, doğrudan otonom, proaktif ve kendi kendini denetleyen (self-correcting) bir **Ajan Fabrikası** (Yapay Zeka Ajan Organizasyonu) modeline eşlenir:
+- **Director Agent (Müdür):** Ön kontrol (preflight) risk değerlendirmesini ve paralel planlama sürecini tetikler (Preflight + Plan düğümleri).
+- **Coordinator Agent (Koordinatör):** LangGraph (`graph.py`) üzerinden durum geçişlerini, bütçeleri ve durum kısıtlamalarını yönetir.
+- **Scout Agent (Keşif):** Dosyaları, bağımlılıkları ve dış çevre (host) yapılandırma sızıntılarını proaktif olarak tarar (`isolation.py`).
+- **Builder/Coder Agent (İnşaatçı):** Geliştirme görevlerini izole ve sınırlandırılmış bir Git worktree alanında yürütür (`execute.py`).
+- **QA & Security Agent (Kalite & Güvenlik):** Sağlayıcılar arası çapraz doğrulamayı yürütür ve yıkıcı komutları filtreleyen komut denetim kurallarını işletir (`verify.py` + `exec_policy.py`).
+
+Roller, güvenlik katmanları ve otonom iş akışları hakkında daha detaylı bilgi için [Ajan Fabrikası Mimari Rehberi](./docs/AJAN_FABRIKASI.md) dokümanını inceleyebilirsiniz.
+
+
 ## 5. Kurulum
 
 ```bash
