@@ -45,3 +45,10 @@ dashboard.html
 
 # === Anonim telemetri kurulum ID (lokal) ===
 .konsey_id
+
+# === Kullanıcıya özel sağlayıcı config (lokal) ===
+konsey.providers.toml
+
+# === Telemetri backend DB (lokal) ===
+telemetry-backend/*.duckdb
+telemetry-backend/*.duckdb.wal

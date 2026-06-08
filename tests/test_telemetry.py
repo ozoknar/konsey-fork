@@ -2,6 +2,7 @@
 import importlib.util
 import os
 import sys
+import types
 from pathlib import Path
 
 _root = Path(__file__).resolve().parent.parent
@@ -16,7 +17,6 @@ def _load(name, rel):
 
 
 # gateway'i 'orchestrator.gateway' olarak yükle ki telemetry'nin 'from .gateway' importu çözülsün
-import types
 pkg = types.ModuleType("orchestrator")
 pkg.__path__ = [str(_root / "orchestrator")]
 sys.modules["orchestrator"] = pkg

@@ -71,9 +71,31 @@ git clone <repo-url> konsey && cd konsey
 > `strict`'te bloklar (global araç için varsayılan değil). Secret-scan medium+strict'te güvenlik
 > tabanıdır. Kendi sağlık/PHI proje adlarınız: `KONSEY_PHI_PROJECTS` (`.env`).
 
+## Sağlayıcılar — hangi YZ ürünlerini kullanıyorsunuz
+Yerleşik varsayılan: **claude** (architect) + **codex** (critic) + **google/agy** (researcher).
+Kendi ürünlerinizi tanımlamak / eklemek için:
+
+```bash
+cp konsey.providers.example.toml konsey.providers.toml   # düzenleyin
+./bin/konsey-doctor                                       # ne hazır, auth tamam mı?
+```
+
+`konsey.providers.toml` her sağlayıcı için: `enabled`, `role`, `command` (`{prompt}`/`{timeout}`
+yer tutucu) ve API-key gerekiyorsa `auth_env`. CLI yoksa veya `auth_env` boşsa sağlayıcı
+otomatik "kullanılamaz" sayılır (graceful). Konsey kalan sağlayıcılarla yürür.
+
+**`konsey doctor` çıktısı** kurulumun gerçekten hazır olduğunu tek bakışta gösterir:
+```
+Sağlayıcılar (kullandığınız YZ ürünleri):
+  claude   [architect ] ✓ hazır
+  codex    [critic    ] ✗ CLI yok (codex)
+  gemini   [researcher] ✗ auth eksik (GEMINI_API_KEY)
+```
+
 ## Gizlilik & telemetri
 Varsayılan **kapalı**. Opt-in açarsanız yalnız **anonim metadata** (özellik kullanımı, hata
 kodu, sürüm) gönderilir — **asla görev içeriği/PHI/secret**. Detay + opt-out: [PRIVACY.md](./PRIVACY.md).
+Backend (ingest + DB + gelir modeli): [telemetry-backend/](./telemetry-backend/) · [TELEMETRY.md](./TELEMETRY.md).
 
 ---
 

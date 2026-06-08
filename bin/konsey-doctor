@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+# Kurulum/sağlayıcı/auth durumunu göster.
+DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+[ -f "$DIR/.env" ] && { set -a; . "$DIR/.env"; set +a; }
+exec "$DIR/.venv/bin/python" -m orchestrator.doctor

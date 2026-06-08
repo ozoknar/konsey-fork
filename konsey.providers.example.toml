@@ -1,0 +1,35 @@
+# Konsey sağlayıcıları — HANGİ YZ ÜRÜNLERİNİ kullanıyorsanız burada tanımlayın.
+# `cp konsey.providers.example.toml konsey.providers.toml` ve düzenleyin.
+# Dosya yoksa yerleşik varsayılanlar (claude + codex + google) kullanılır.
+#
+# Komut şablonu yer tutucuları:  {prompt}  {timeout}
+# role: architect (lead) | critic | researcher | juror
+# auth: çoğu CLI kendi OAuth/aboneliğiyle girer. API-key gerekiyorsa auth_env ver
+#       → o ortam değişkeni yoksa sağlayıcı "kullanılamaz" sayılır (graceful).
+
+[providers.claude]
+enabled = true
+role = "architect"
+provider = "anthropic"
+command = ["claude", "-p", "{prompt}"]
+prompt_prefix = "Answer directly in plain text. Do not use any tools.\n\n"
+# auth_env = "ANTHROPIC_API_KEY"   # CLI OAuth kullanıyorsa gerekmez
+
+[providers.codex]
+enabled = true
+role = "critic"
+provider = "openai"
+command = ["codex", "exec", "--skip-git-repo-check", "{prompt}"]
+
+[providers.gemini]
+enabled = true
+role = "researcher"
+provider = "google"
+command = ["agy", "--print-timeout", "{timeout}s", "-p", "{prompt}"]
+
+# --- Örnek: API-key ile çalışan özel bir sağlayıcı eklemek ---
+# [providers.my-llm]
+# enabled = false
+# role = "juror"
+# command = ["my-llm-cli", "--prompt", "{prompt}"]
+# auth_env = "MY_LLM_API_KEY"      # bu env yoksa devre dışı sayılır

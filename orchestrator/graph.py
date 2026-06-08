@@ -14,7 +14,7 @@ from typing import Annotated, TypedDict
 from langgraph.graph import END, START, StateGraph
 
 from . import audit
-from .adapters import ADAPTERS, available
+from .adapters import ADAPTERS, available, pick
 from .decide import decide
 from .gateway import preflight as gw_preflight
 
@@ -98,6 +98,12 @@ def _ask(s: S, agent: str, prompt: str, mtype: str, timeout: int = 180) -> tuple
     return r.text, {"calls": 1, "tool_failures": 0 if r.ok else 1, "evidence": [ev], "_ok": r.ok}
 
 
+def _lead(avail: dict | None = None) -> str:
+    """Lead/architect sağlayıcısı: rol 'architect' olan ilk kullanılabilir; yoksa herhangi biri."""
+    avail = avail if avail is not None else available()
+    return pick("architect", avail) or next((n for n, ok in avail.items() if ok), "claude")
+
+
 def plan(s: S) -> dict:
     if _dead(s):
         return {}
@@ -107,9 +113,7 @@ def plan(s: S) -> dict:
     avail = available()
     plans, agg = {}, {"calls": 0, "tool_failures": 0, "evidence": []}
     ok_count = 0
-    for agent in ("claude", "codex", "google"):
-        if not avail.get(agent):
-            continue
+    for agent in [n for n, ok in avail.items() if ok]:
         prompt = (f"Görev: {s['task']}\nBağımsız planını/cevabını ver: adımlar, varsayımlar, "
                   f"riskler. Kısa ve somut ol.")
         text, d = _ask(s, agent, prompt, "plan")
@@ -128,7 +132,7 @@ def critique(s: S) -> dict:
     if k:
         return k
     avail = available()
-    critic = "codex" if avail.get("codex") else ("google" if avail.get("google") else "claude")
+    critic = pick("critic", avail) or _lead(avail)
     joined = "\n\n".join(f"[{a}]\n{t[:1500]}" for a, t in s.get("plans", {}).items())
     prompt = (f"Konsey görevi: {s['task']}\nTaslak planlar:\n{joined}\n\n"
               f"Adversarial eleştir: anlaşmazlıklar, eksik adımlar, gizli riskler. "
@@ -147,7 +151,7 @@ def synthesize(s: S) -> dict:
     joined = "\n\n".join(f"[{a}]\n{t[:1200]}" for a, t in s.get("plans", {}).items())
     prompt = (f"Görev: {s['task']}\nPlanlar:\n{joined}\n\nEleştiri:\n{s.get('critique','')[:1500]}\n\n"
               f"Hepsini birleştiren TEK ortak plan/yaklaşım üret (Joint Plan). Kısa, sahipli adımlar.")
-    text, d = _ask(s, "claude", prompt, "synthesize")
+    text, d = _ask(s, _lead(), prompt, "synthesize")
     return {"joint_plan": text, "calls": d["calls"], "tool_failures": d["tool_failures"], "evidence": d["evidence"]}
 
 
@@ -159,7 +163,7 @@ def execute(s: S) -> dict:
         return k
     prompt = (f"Görev: {s['task']}\nOrtak plan:\n{s.get('joint_plan','')[:2500]}\n\n"
               f"Nihai çıktıyı üret. Somut, doğrulanabilir. Kısa.")
-    text, d = _ask(s, "claude", prompt, "execute")
+    text, d = _ask(s, _lead(), prompt, "execute")
     return {"execution": text, "calls": d["calls"], "tool_failures": d["tool_failures"], "evidence": d["evidence"]}
 
 
@@ -167,8 +171,9 @@ def verify(s: S) -> dict:
     if _dead(s):
         return {}
     avail = available()
-    # Çapraz doğrulama: üreten doğrulayamaz → execution claude'du, verify google/codex
-    verifier = "google" if avail.get("google") else ("codex" if avail.get("codex") else "claude")
+    # Çapraz doğrulama: üreten (lead) doğrulayamaz → farklı bir sağlayıcı doğrular
+    lead = _lead(avail)
+    verifier = pick("researcher", avail, exclude=(lead,)) or pick("critic", avail, exclude=(lead,)) or lead
     prompt = (f"Görev: {s['task']}\nÜretilen cevap:\n{s.get('execution','')[:2500]}\n\n"
               f"Bağımsız doğrula: olgusal iddialar tutarlı mı? İlk satır 'VERDICT: PASS' veya "
               f"'VERDICT: FAIL', sonra 1-3 madde gerekçe. Kısa.")
