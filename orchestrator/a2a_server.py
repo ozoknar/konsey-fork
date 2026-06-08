@@ -9,6 +9,7 @@ Endpoint'ler:
 from __future__ import annotations
 
 import json
+import os
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
@@ -17,6 +18,7 @@ from .gateway import preflight
 ROOT = Path(__file__).resolve().parent.parent
 CARD = ROOT / "a2a" / "agent-card.json"
 ALLOWED_AUTO = {"public", "internal"}   # A2A üstünden otonom tavan (Md.13.7)
+_LOOPBACK = {"127.0.0.1", "localhost", "::1", ""}
 
 
 def _card() -> dict:
@@ -65,6 +67,9 @@ class Handler(BaseHTTPRequestHandler):
     def do_POST(self):
         if self.path != "/a2a/task":
             return self._send(404, {"status": "error", "reason": "bilinmeyen yol"})
+        token = os.getenv("KONSEY_A2A_TOKEN", "")
+        if token and self.headers.get("Authorization", "") != f"Bearer {token}":
+            return self._send(401, {"status": "error", "reason": "yetkisiz (Bearer token gerekli)"})
         try:
             n = int(self.headers.get("Content-Length", 0))
             payload = json.loads(self.rfile.read(n) or b"{}")
@@ -74,8 +79,14 @@ class Handler(BaseHTTPRequestHandler):
 
 
 def serve(host: str = "127.0.0.1", port: int = 8787) -> None:
+    # Fail-closed: loopback dışı bind, kimlik doğrulama token'ı olmadan AÇILMAZ.
+    if host not in _LOOPBACK and not os.getenv("KONSEY_A2A_TOKEN"):
+        raise SystemExit(
+            f"A2A REDDEDİLDİ: loopback dışı bind ({host}) için KONSEY_A2A_TOKEN şart "
+            "(fail-closed). Kimlik doğrulamasız public bind açılamaz.")
     srv = ThreadingHTTPServer((host, port), Handler)
-    print(f"A2A council node: http://{host}:{port}  (card: /.well-known/agent-card.json)")
+    scope = "loopback" if host in _LOOPBACK else f"public+auth ({host})"
+    print(f"A2A council node: http://{host}:{port} [{scope}] (card: /.well-known/agent-card.json)")
     srv.serve_forever()
 
 

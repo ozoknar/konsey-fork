@@ -1,21 +1,31 @@
 #!/usr/bin/env bash
-# Konsey tek-komut kurulum: venv + bağımlılıklar + audit DB şeması.
+# Konsey kurulum — yerel veya uzak.
+#   Yerel:  ./install.sh
+#   Uzak:   curl -fsSL <repo-raw-url>/install.sh | bash
+# Etkileşimsiz (CI): KONSEY_ASSUME_YES=1 ve istenirse KONSEY_SECURITY_LEVEL / KONSEY_TELEMETRY önceden set.
 set -euo pipefail
-cd "$(dirname "$0")"
+
+REPO_URL="${KONSEY_REPO_URL:-https://github.com/<ORG>/konsey.git}"   # yayında gerçek URL ile değiştir
+
+# --- Uzak bootstrap: repo yoksa klonla ---
+if [ ! -f "schema.sql" ] || [ ! -d "orchestrator" ]; then
+  echo "▸ Konsey klonlanıyor ($REPO_URL)..."
+  command -v git >/dev/null || { echo "git gerekli."; exit 1; }
+  git clone --depth 1 "$REPO_URL" konsey
+  cd konsey
+fi
 
 PY="${PYTHON:-python3}"
 echo "▸ Python: $($PY --version)"
 
-echo "▸ venv oluşturuluyor (.venv)..."
+echo "▸ venv (.venv) + bağımlılıklar..."
 "$PY" -m venv .venv
 # shellcheck disable=SC1091
 . .venv/bin/activate
-
-echo "▸ bağımlılıklar kuruluyor (langgraph, duckdb)..."
 pip install --quiet --upgrade pip
 pip install --quiet -e .
 
-echo "▸ audit DB şeması kuruluyor (idempotent)..."
+echo "▸ audit DB şeması (idempotent)..."
 python - <<'PY'
 import duckdb, os, pathlib
 db = os.getenv("KONSEY_DB", "council.duckdb")
@@ -23,10 +33,36 @@ duckdb.connect(db).execute(pathlib.Path("schema.sql").read_text(encoding="utf-8"
 print(f"  şema hazır: {db}")
 PY
 
-echo "▸ bin/ çalıştırılabilir yapılıyor..."
-chmod +x bin/* 2>/dev/null || true
+chmod +x bin/* install.sh 2>/dev/null || true
 
-[ -f .env ] || { cp .env.example .env; echo "▸ .env oluşturuldu (.env.example'dan)"; }
+# --- Yapılandırma: .env (interaktif consent) ---
+if [ ! -f .env ]; then
+  cp .env.example .env
+  LEVEL="${KONSEY_SECURITY_LEVEL:-medium}"
+  TELEM="${KONSEY_TELEMETRY:-off}"
+
+  if [ -t 0 ] && [ "${KONSEY_ASSUME_YES:-0}" != "1" ]; then
+    echo
+    echo "Güvenlik seviyesi seçin (akışkanlık ↔ güvenlik):"
+    echo "  1) strict  — secret+PHI bloklar, ≥2 sağlayıcı, insan onayı"
+    echo "  2) medium  — secret bloklar, PHI uyarır (önerilen)"
+    echo "  3) weak    — yalnız uyarır, max akışkanlık"
+    read -rp "Seçim [2]: " s; case "$s" in 1) LEVEL=strict;; 3) LEVEL=weak;; *) LEVEL=medium;; esac
+
+    echo
+    echo "Anonim kullanım verisi paylaşımı (opt-in) — ürünü geliştirmemize yardım eder."
+    echo "Toplanan: yalnız anonim metadata (özellik kullanımı, hata kodu, sürüm)."
+    echo "ASLA: görev içeriği, PHI, secret. Detay: PRIVACY.md. Reddetseniz de araç tam çalışır."
+    read -rp "Paylaşımı açayım mı? [e/H]: " t
+    case "$t" in [eEyY]*) TELEM=on;; *) TELEM=off;; esac
+  fi
+
+  # .env'e yaz (idempotent: anahtar varsa değiştir, yoksa ekle)
+  _set() { grep -q "^$1=" .env && sed -i.bak "s|^$1=.*|$1=$2|" .env || echo "$1=$2" >> .env; rm -f .env.bak; }
+  _set KONSEY_SECURITY_LEVEL "$LEVEL"
+  _set KONSEY_TELEMETRY "$TELEM"
+  echo "▸ .env yazıldı (güvenlik=$LEVEL, telemetri=$TELEM)"
+fi
 
 echo
 echo "✓ Kurulum tamam. Dene:"

@@ -15,10 +15,16 @@ PREFLIGHT → PLAN → CRITIQUE → SYNTHESIZE → EXECUTE → VERIFY → DECIDE
 
 ## Hızlı başlangıç
 
+**Tek komut (uzak):**
+```bash
+curl -fsSL https://raw.githubusercontent.com/<ORG>/konsey/main/install.sh | bash
+```
+Kurulum sırasında **güvenlik seviyesi** ve **opt-in telemetri** sorulur (ikisi de varsayılan-güvenli).
+
+**Veya klonla:**
 ```bash
 git clone <repo-url> konsey && cd konsey
-./install.sh                       # venv + bağımlılıklar + audit DB şeması (tek komut)
-cp .env.example .env               # opsiyonel — varsayılanlar makul
+./install.sh                       # venv + bağımlılıklar + DB şeması + .env (tek komut)
 ./bin/konsey-run "ilk görevim"     # headless tam döngü
 ```
 
@@ -46,13 +52,28 @@ cp .env.example .env               # opsiyonel — varsayılanlar makul
 
 | Değişken | Varsayılan | Açıklama |
 |---|---|---|
-| `KONSEY_PROVIDERS_MIN` | `1` | Çalışmak için gereken min. bağımsız sağlayıcı (sıkı mod: `2`) |
+| `KONSEY_SECURITY_LEVEL` | `medium` | `strict` \| `medium` \| `weak` — akışkanlık ↔ güvenlik |
+| `KONSEY_PROVIDERS_MIN` | seviyeden | Min. sağlayıcı (boşsa: strict→2, diğer→1) |
+| `KONSEY_TELEMETRY` | `off` | Opt-in anonim telemetri (`on` ile açılır; bkz. PRIVACY.md) |
 | `KONSEY_USER` | `local` | Audit kayıtlarındaki kullanıcı etiketi |
 | `KONSEY_DB` | `./council.duckdb` | Audit DB yolu |
+| `KONSEY_A2A_TOKEN` | — | Loopback dışı A2A bind için zorunlu token |
 
-> **Guardrail'ler katmanlıdır.** Çekirdek motor kısıtsızdır; KVKK/PHI taraması, secret-scan ve
-> audit opsiyonel ara katmandır (`orchestrator/gateway.py`). Sağlık/regülasyon kullanımında
-> "sıkı" preset (PHI bloklama + audit + ≥2 sağlayıcı + insan onayı) açılır.
+### Güvenlik seviyeleri
+
+| | secret | PHI | insan onayı | sağlayıcı |
+|---|---|---|---|---|
+| **strict** | blok | blok | phi/prod zorunlu | ≥2 |
+| **medium** | blok | uyarı | — | ≥1 |
+| **weak** | uyarı | yok say | — | ≥1 |
+
+> **Guardrail'ler katmanlı + opt-in.** Çekirdek motor kısıtsızdır; PHI/sağlık koruması yalnız
+> `strict`'te bloklar (global araç için varsayılan değil). Secret-scan medium+strict'te güvenlik
+> tabanıdır. Kendi sağlık/PHI proje adlarınız: `KONSEY_PHI_PROJECTS` (`.env`).
+
+## Gizlilik & telemetri
+Varsayılan **kapalı**. Opt-in açarsanız yalnız **anonim metadata** (özellik kullanımı, hata
+kodu, sürüm) gönderilir — **asla görev içeriği/PHI/secret**. Detay + opt-out: [PRIVACY.md](./PRIVACY.md).
 
 ---
 

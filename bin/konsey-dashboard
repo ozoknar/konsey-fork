@@ -1,3 +1,9 @@
 #!/usr/bin/env bash
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-"$DIR/.venv/bin/python" -m orchestrator.dashboard && open "$DIR/dashboard.html" 2>/dev/null || true
+"$DIR/.venv/bin/python" -m orchestrator.dashboard || exit 1
+# Cross-platform aç (macOS/Linux/diğer)
+case "$(uname -s)" in
+  Darwin) open "$DIR/dashboard.html" 2>/dev/null || true ;;
+  Linux)  xdg-open "$DIR/dashboard.html" 2>/dev/null || true ;;
+  *)      echo "dashboard hazır: $DIR/dashboard.html" ;;
+esac

@@ -79,11 +79,13 @@ def preflight(s: S) -> dict:
     if gw.blocked:
         out.update(blocked=True, block_reason=gw.block_reason, killed=True, kill_reason=gw.block_reason)
         audit.incident(sid, "gateway_block", gw.block_reason)
-    elif n_prov < int(os.getenv("KONSEY_PROVIDERS_MIN", "1")):
-        _min = os.getenv("KONSEY_PROVIDERS_MIN", "1")
-        out.update(blocked=True,
-                   block_reason=f"Yalnız {n_prov} sağlayıcı — KONSEY_PROVIDERS_MIN={_min} (sıkı mod ≥2)",
-                   killed=True, kill_reason="insufficient_providers")
+    else:
+        _min = int(os.getenv("KONSEY_PROVIDERS_MIN") or
+                   (2 if os.getenv("KONSEY_SECURITY_LEVEL", "medium").lower() == "strict" else 1))
+        if n_prov < _min:
+            out.update(blocked=True,
+                       block_reason=f"Yalnız {n_prov} sağlayıcı — gereken min {_min} (strict→2, medium/weak→1)",
+                       killed=True, kill_reason="insufficient_providers")
     return out
 
 
@@ -248,6 +250,14 @@ def memory(s: S) -> dict:
     status = "aborted" if _dead(s) else "done"
     if sid:
         audit.end_session(sid, status, round(s.get("calls", 0) * 0.01, 2))
+    try:  # opt-in anonim telemetri (yalnız metadata; ana akışı bozmaz)
+        from . import telemetry
+        telemetry.emit("council_run", status=status, risk_class=s.get("risk"),
+                       providers_count=s.get("providers_ok", 0),
+                       duration_ms=int((time.time() - s.get("t_start", time.time())) * 1000),
+                       security_level=os.getenv("KONSEY_SECURITY_LEVEL", "medium"))
+    except Exception:
+        pass
     return {}
 
 

@@ -42,3 +42,6 @@ playbooks/*.js
 
 # === Üretilen dashboard (gerçek oturum verisi içerir) ===
 dashboard.html
+
+# === Anonim telemetri kurulum ID (lokal) ===
+.konsey_id

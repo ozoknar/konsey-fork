@@ -46,9 +46,16 @@ def _notify(title: str, msg: str) -> None:
     def _safe(s: str) -> str:
         return re.sub(r'[\\"\n\r`$]', " ", str(s))[:120]
     try:
-        subprocess.run(["osascript", "-e",
-                        f'display notification "{_safe(msg)}" with title "Konsey" subtitle "{_safe(title)}"'],
-                       capture_output=True, timeout=10)
+        import platform
+        sysname = platform.system()
+        if sysname == "Darwin":
+            subprocess.run(["osascript", "-e",
+                            f'display notification "{_safe(msg)}" with title "Konsey" subtitle "{_safe(title)}"'],
+                           capture_output=True, timeout=10)
+        elif sysname == "Linux":
+            subprocess.run(["notify-send", f"Konsey — {_safe(title)}", _safe(msg)],
+                           capture_output=True, timeout=10)
+        # Windows/headless: sessiz (bildirim opsiyonel)
     except Exception:
         pass  # bildirim opsiyonel; başarısızlık akışı durdurmaz
 

@@ -93,24 +93,47 @@ def scan_secrets(text: str) -> list[str]:
     return found
 
 
-def preflight(task: str, project_hint: str = "") -> GatewayResult:
+def _security_level(explicit: str | None = None) -> str:
+    """Güvenlik seviyesi: strict | medium | weak. Varsayılan medium.
+    Kullanıcı KONSEY_SECURITY_LEVEL ile akışkanlık-güvenlik dengesini seçer."""
+    lvl = (explicit or os.getenv("KONSEY_SECURITY_LEVEL", "medium")).lower()
+    return lvl if lvl in ("strict", "medium", "weak") else "medium"
+
+
+def preflight(task: str, project_hint: str = "", level: str | None = None) -> GatewayResult:
+    """Risk sınıflandırma + secret/PII taraması, seçilen güvenlik seviyesine göre uygulama.
+
+    - **strict**: secret + PHI bloklar, phi/production insan onayı ister (max güvenlik).
+    - **medium**: secret bloklar, PHI uyarır (varsayılan; dengeli).
+    - **weak**: yalnız uyarır, hiçbir şeyi bloklamaz (max akışkanlık).
+    """
+    level = _security_level(level)
     risk = classify_risk(task, project_hint)
     budget = BUDGET[risk]
-    secrets = scan_secrets(f"{task} {project_hint}")   # F10: project_hint de LLM'e gidiyor → o da taranır
+    secrets = scan_secrets(f"{task} {project_hint}")   # girdi de LLM'e gidiyor → taranır
     res = GatewayResult(risk=risk, budget=dict(budget), secrets_found=secrets)
+    res.notes.append(f"security_level={level}")
 
-    if risk == "phi":
-        res.blocked = True
-        res.block_reason = (
-            "PHI sınıfı: hasta verisi tüketici LLM'e gönderilemez (Madde 13.1). "
-            "Local pipeline (yerel model) + insan onayı gerekir."
-        )
+    # Secret/kimlik: strict+medium bloklar; weak yalnız uyarır (kendi anahtarını sızdırma riskine karşı).
     if secrets:
-        res.blocked = True
-        res.block_reason = (res.block_reason + " | " if res.block_reason else "") + \
-            f"Secret/kimlik tespit edildi: {secrets} (Madde 13.3) — maskelenmeden konseye gitmez."
-    if risk in ("phi", "production"):
-        res.notes.append("İnsan onayı zorunlu (Madde 7.3).")
+        if level in ("strict", "medium"):
+            res.blocked = True
+            res.block_reason = f"Secret/kimlik tespit edildi: {secrets} — maskelenmeden gönderilmez."
+        else:
+            res.notes.append(f"⚠ Secret göstergesi: {secrets} (weak: bloklanmadı)")
+
+    # PHI: koruma OPT-IN — yalnız strict bloklar, medium uyarır, weak yok sayar.
+    if risk == "phi":
+        if level == "strict":
+            res.blocked = True
+            res.block_reason = (res.block_reason + " | " if res.block_reason else "") + \
+                "PHI sınıfı: hasta verisi tüketici LLM'e gönderilemez. Yerel model + insan onayı."
+        elif level == "medium":
+            res.notes.append("⚠ PHI göstergesi (medium: uyarı; strict'te bloklanır)")
+
+    # İnsan onayı: yalnız strict'te phi/production için zorunlu.
+    if level == "strict" and risk in ("phi", "production"):
+        res.notes.append("İnsan onayı zorunlu.")
     if PHI_PROJECT and PHI_PROJECT.search(f"{task} {project_hint}") and risk != "phi":
-        res.notes.append("PHI projesi: tartışma serbest ama GERÇEK hasta verisi/görüntü konseye gönderilmez.")
+        res.notes.append("Tanımlı proje: tartışma serbest ama gerçek hassas veri gönderme.")
     return res
