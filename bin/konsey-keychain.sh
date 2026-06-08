@@ -17,9 +17,16 @@
 #      KONSEY_KEYCHAIN_SERVICES="svc1 svc2" ortam değişkeni.
 
 set -euo pipefail
-ACCT="${USER}"
+ACCT="${USER:-$(id -un 2>/dev/null || echo user)}"
 CMD="${1:-help}"
 SVC="${2:-}"
+
+# Platform-gate: bu helper macOS Keychain (security) kullanır.
+if [ "$(uname -s)" != "Darwin" ] && [ "$CMD" != "help" ]; then
+  echo "Bu helper yalnız macOS Keychain (security) içindir." >&2
+  echo "Diğer platformlarda secret'ı .env'e koyun veya cross-platform 'keyring' aracını kullanın." >&2
+  exit 1
+fi
 
 read -ra EXPECTED <<< "${KONSEY_KEYCHAIN_SERVICES:-konsey-anthropic konsey-openai konsey-google}"
 

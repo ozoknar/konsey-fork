@@ -10,6 +10,7 @@
 from __future__ import annotations
 
 import json
+import os
 import re
 import subprocess
 import sys
@@ -21,7 +22,7 @@ from .gateway import preflight
 from .graph import build
 
 HOME = Path.home()
-BRIDGE = HOME / "Claude" / "konsey"
+BRIDGE = Path(os.getenv("KONSEY_BRIDGE_DIR", HOME / "Claude" / "konsey"))
 INBOX, OUTBOX = BRIDGE / "inbox", BRIDGE / "outbox"
 QUEUE_HUMAN, PROCESSED = BRIDGE / "queue-human", BRIDGE / "processed"
 SCHED_DIR = Path(__file__).resolve().parent.parent / "scheduled"
@@ -141,14 +142,18 @@ def run_scheduled() -> int:
 
 
 def tick() -> None:
-    import fcntl
-    lockf = open(SCHED_DIR / ".tick.lock", "w")     # tek-örnek: çakışan tick'ler double-process yapmasın
     try:
-        fcntl.flock(lockf, fcntl.LOCK_EX | fcntl.LOCK_NB)
-    except BlockingIOError:
-        print(f"[{datetime.now():%Y-%m-%d %H:%M}] tick atlandı (başka tick çalışıyor)")
-        lockf.close()
-        return
+        import fcntl
+    except ModuleNotFoundError:        # Windows: dosya-kilidi yok → tek-örnek garantisi atlanır
+        fcntl = None
+    lockf = open(SCHED_DIR / ".tick.lock", "w")     # tek-örnek: çakışan tick'ler double-process yapmasın
+    if fcntl is not None:
+        try:
+            fcntl.flock(lockf, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            print(f"[{datetime.now():%Y-%m-%d %H:%M}] tick atlandı (başka tick çalışıyor)")
+            lockf.close()
+            return
     try:
         a = process_inbox()
         b = run_scheduled()
@@ -162,7 +167,8 @@ def tick() -> None:
             c = f"err:{e}"
         print(f"[{datetime.now():%Y-%m-%d %H:%M}] inbox={a} scheduled={b} capture={c}")
     finally:
-        fcntl.flock(lockf, fcntl.LOCK_UN)
+        if fcntl is not None:
+            fcntl.flock(lockf, fcntl.LOCK_UN)
         lockf.close()
 
 

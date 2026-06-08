@@ -2,5 +2,5 @@
 # SessionStart hook → tick'in ÖNCEDEN ürettiği recall-cache'i basar.
 # F5: DB bağlantısı YOK → lock contention/asılma yok, ~0ms. Dosya yoksa boş çıktı.
 [ -n "$KONSEY_DISTILL" ] && exit 0
-cat "$HOME/Claude/konsey/recall-cache.json" 2>/dev/null
+cat "${KONSEY_BRIDGE_DIR:-$HOME/Claude/konsey}/recall-cache.json" 2>/dev/null
 exit 0

@@ -26,3 +26,13 @@ def test_audit_has_lock_retry():
     pytest.importorskip("duckdb")
     from orchestrator import audit
     assert hasattr(audit, "_connect")
+
+
+def test_bridge_dir_configurable(tmp_path, monkeypatch):
+    """Dispatch köprü dizini KONSEY_BRIDGE_DIR ile yapılandırılabilmeli (hardcoded değil)."""
+    pytest.importorskip("langgraph")
+    import importlib
+    monkeypatch.setenv("KONSEY_BRIDGE_DIR", str(tmp_path / "br"))
+    from orchestrator import dispatch
+    importlib.reload(dispatch)
+    assert str(tmp_path / "br") in str(dispatch.BRIDGE)
