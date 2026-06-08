@@ -27,7 +27,7 @@ from pathlib import Path
 
 import duckdb
 
-from .adapters import ClaudeAdapter
+from .adapters import ADAPTERS, available, pick
 from .gateway import classify_risk, SECRET_PATTERNS
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -232,10 +232,11 @@ def _distill(text: str, label: str):
         f"---OTURUM---\n{masked}")
     os.environ["KONSEY_DISTILL"] = "1"                     # recursion guard (adapters env'i çağrı-anında okur)
     try:
-        r = ClaudeAdapter().run(prompt, timeout=120)
+        _name = pick("architect", available()) or next(iter(ADAPTERS), None)
+        r = ADAPTERS[_name].run(prompt, timeout=120) if _name else None
     finally:
         os.environ.pop("KONSEY_DISTILL", None)
-    if not r.ok:
+    if not r or not r.ok:
         return None
     return _parse_json(r.text)
 

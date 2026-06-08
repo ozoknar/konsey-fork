@@ -7,6 +7,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import time
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
@@ -36,8 +37,22 @@ def _now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
+def _connect(retries: int = 25, delay: float = 0.12):
+    """DuckDB cross-process exclusive-lock'a karşı bounded retry (eşzamanlı konsey komutları)."""
+    last = None
+    for _ in range(retries):
+        try:
+            return duckdb.connect(str(DB))
+        except Exception as e:  # noqa: BLE001
+            if "lock" not in str(e).lower() and "conflicting" not in str(e).lower():
+                raise
+            last = e
+            time.sleep(delay)
+    raise last
+
+
 def _ins(sql: str, params: list) -> None:
-    with duckdb.connect(str(DB)) as c:
+    with _connect() as c:
         _ensure_schema(c)
         c.execute(sql, params)
 

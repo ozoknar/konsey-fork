@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
 # Konsey deterministik orkestratör (Faz 2) — headless tam döngü
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+[ -x "$DIR/.venv/bin/python" ] || { echo "Konsey kurulu değil — önce ./install.sh çalıştırın." >&2; exit 1; }
 exec "$DIR/.venv/bin/python" -m orchestrator.run "$@"

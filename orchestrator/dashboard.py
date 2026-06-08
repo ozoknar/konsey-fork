@@ -7,13 +7,14 @@ statik dosya: uzak Mac'te de açılır, çalışan servis gerektirmez.
 from __future__ import annotations
 
 import html
+import os
 from datetime import datetime
 from pathlib import Path
 
 import duckdb
 
 ROOT = Path(__file__).resolve().parent.parent
-DB = ROOT / "council.duckdb"
+DB = Path(os.getenv("KONSEY_DB", ROOT / "council.duckdb"))
 OUT = ROOT / "dashboard.html"
 
 CSS = """

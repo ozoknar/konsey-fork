@@ -38,6 +38,7 @@ class S(TypedDict, total=False):
     execution: str
     verify_verdict: str
     verify_ok: bool
+    verify_self: bool
     verify_retries: int
     decision: dict
     report: str
@@ -101,7 +102,9 @@ def _ask(s: S, agent: str, prompt: str, mtype: str, timeout: int = 180) -> tuple
 def _lead(avail: dict | None = None) -> str:
     """Lead/architect sağlayıcısı: rol 'architect' olan ilk kullanılabilir; yoksa herhangi biri."""
     avail = avail if avail is not None else available()
-    return pick("architect", avail) or next((n for n, ok in avail.items() if ok), "claude")
+    return (pick("architect", avail)
+            or next((n for n, ok in avail.items() if ok), None)
+            or next(iter(ADAPTERS), "claude"))
 
 
 def plan(s: S) -> dict:
@@ -174,14 +177,16 @@ def verify(s: S) -> dict:
     # Çapraz doğrulama: üreten (lead) doğrulayamaz → farklı bir sağlayıcı doğrular
     lead = _lead(avail)
     verifier = pick("researcher", avail, exclude=(lead,)) or pick("critic", avail, exclude=(lead,)) or lead
+    self_check = (verifier == lead)   # tek sağlayıcı → kendi-kontrolü, BAĞIMSIZ çapraz değil
     prompt = (f"Görev: {s['task']}\nÜretilen cevap:\n{s.get('execution','')[:2500]}\n\n"
               f"Bağımsız doğrula: olgusal iddialar tutarlı mı? İlk satır 'VERDICT: PASS' veya "
               f"'VERDICT: FAIL', sonra 1-3 madde gerekçe. Kısa.")
     text, d = _ask(s, verifier, prompt, "verify")
     ok = "PASS" in text.split("\n", 1)[0].upper()
     if ok:
-        audit.evidence(s["session_id"], "cross_validation", f"{verifier} VERDICT PASS", verifier, "orchestrator")
-    return {"verify_verdict": text, "verify_ok": ok,
+        etype = "self_check" if self_check else "cross_validation"
+        audit.evidence(s["session_id"], etype, f"{verifier} VERDICT PASS ({etype})", verifier, "orchestrator")
+    return {"verify_verdict": text, "verify_ok": ok, "verify_self": self_check,
             "verify_retries": s.get("verify_retries", 0) + 1,
             "calls": d["calls"], "tool_failures": d["tool_failures"], "evidence": d["evidence"]}
 
@@ -201,7 +206,7 @@ def decide_node(s: S) -> dict:
                "rationale": s.get("kill_reason") or s.get("block_reason") or "aborted"}
         audit.decision(sid, "ABORTED: " + dec["rationale"], 0.0, [], [], False)
         return {"decision": dec}
-    n_cross = (1 if s.get("verify_ok") else 0)
+    n_cross = (1 if (s.get("verify_ok") and not s.get("verify_self")) else 0)
     dec = decide(
         risk=s.get("risk", "internal"),
         n_providers_ok=s.get("providers_ok", 0),

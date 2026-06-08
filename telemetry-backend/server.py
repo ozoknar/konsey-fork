@@ -13,10 +13,13 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 import duckdb
+
+_WLOCK = threading.Lock()   # ThreadingHTTPServer + DuckDB tek-yazar: yazımları serileştir
 
 _ROOT = Path(__file__).resolve().parent
 DB = Path(os.getenv("KONSEY_TELEMETRY_DB", _ROOT / "telemetry.duckdb"))
@@ -59,7 +62,7 @@ def ingest(payload: dict) -> dict:
     cols = ["install_hash"] + list(_FIELDS)
     vals = [ih] + [row[k] for k in _FIELDS]
     placeholders = ",".join(["?"] * len(cols))
-    with _conn() as c:
+    with _WLOCK, _conn() as c:
         c.execute(f"INSERT INTO events({','.join(cols)}) VALUES ({placeholders})", vals)
     return {"ok": True}
 
@@ -97,7 +100,10 @@ class Handler(BaseHTTPRequestHandler):
             payload = json.loads(self.rfile.read(n) or b"{}")
         except Exception as e:
             return self._send(400, {"reason": f"geçersiz JSON: {e}"})
-        r = ingest(payload)
+        try:
+            r = ingest(payload)
+        except Exception as e:
+            return self._send(500, {"reason": f"ingest hata: {e}"})
         self._send(204 if r["ok"] else 400, None if r["ok"] else r)
 
     def do_GET(self):

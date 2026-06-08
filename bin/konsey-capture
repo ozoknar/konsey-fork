@@ -4,7 +4,7 @@
 # Recursion guard: YALNIZ KONSEY_DISTILL env (F1: .distilling lock kaldırıldı — meşru
 # eşzamanlı oturumu düşürüyordu = audit kaybı; recursion zaten env ile engelli).
 [ -n "$KONSEY_DISTILL" ] && exit 0
-ROOT="$HOME/Projects/council"
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"   # script konumundan çöz (hardcoded değil)
 [ -x "$ROOT/.venv/bin/python" ] || exit 0
 ( cd "$ROOT" 2>/dev/null && "$ROOT/.venv/bin/python" -m orchestrator.capture hook ) 2>/dev/null
 exit 0

@@ -12,6 +12,7 @@ import hashlib
 import json
 import os
 import sys
+import time
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
@@ -25,9 +26,21 @@ _schema_done = False
 
 
 def _conn():
-    """Bağlantı aç; ilk çağrıda şemayı otomatik kur (taze DB → manuel adım gerekmez)."""
+    """Bağlantı aç (lock'a karşı bounded retry); ilk çağrıda şemayı otomatik kur."""
     global _schema_done
-    c = duckdb.connect(str(DB))
+    last = None
+    c = None
+    for _ in range(25):
+        try:
+            c = duckdb.connect(str(DB))
+            break
+        except Exception as e:  # noqa: BLE001
+            if "lock" not in str(e).lower() and "conflicting" not in str(e).lower():
+                raise
+            last = e
+            time.sleep(0.12)
+    if c is None:
+        raise last
     if not _schema_done and SCHEMA.exists():
         c.execute(SCHEMA.read_text(encoding="utf-8"))
         _schema_done = True

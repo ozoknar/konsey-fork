@@ -49,6 +49,8 @@ def _install_id() -> str:
 
 def _safe(value):
     """String'leri kısalt + secret içeriyorsa düşür (redaksiyon güvenlik ağı)."""
+    if value is None:
+        return None
     if isinstance(value, bool) or isinstance(value, (int, float)):
         return value
     s = str(value)

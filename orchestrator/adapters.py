@@ -51,7 +51,10 @@ def load_providers() -> dict[str, dict]:
     if _CONFIG.exists() and tomllib is not None:
         try:
             data = tomllib.loads(_CONFIG.read_text(encoding="utf-8"))
-            return data.get("providers", data) or DEFAULT_PROVIDERS
+            provs = data.get("providers", data)
+            # Şekil doğrula: yalnız dict-değerli (tablo) sağlayıcılar; bozuksa defaults.
+            clean = {k: v for k, v in provs.items() if isinstance(v, dict) and v.get("command")}
+            return clean or DEFAULT_PROVIDERS
         except Exception:
             return DEFAULT_PROVIDERS
     return DEFAULT_PROVIDERS
