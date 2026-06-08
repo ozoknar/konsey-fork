@@ -1,0 +1,38 @@
+{
+  "name": "KonseyCouncil",
+  "version": "1.0.0",
+  "description": "Konsey orkestratör düğümü — Claude+Codex+Google kanıt-ağırlıklı çoklu-ajan konsey. Geliştirme/araştırma/mimari düğümü.",
+  "url": "http://127.0.0.1:8787",
+  "provider": {
+    "organization": "",
+    "node": "local"
+  },
+  "nodes": ["claude (anthropic)", "codex (openai)", "google (antigravity)"],
+  "capabilities": [
+    "multi_agent_council",
+    "evidence_weighted_decision",
+    "architecture_review",
+    "code_generation",
+    "research",
+    "cross_validation"
+  ],
+  "skills": [
+    {
+      "id": "council",
+      "name": "Run council",
+      "description": "9-durumlu kanıt-ağırlıklı konseyi bir görev üzerinde çalıştırır; rapor + karar döner.",
+      "input": "task_package_v1 {task, project_hint?}",
+      "output": "agent_output_v1 {status, report, decision}"
+    }
+  ],
+  "risk_profile_max": "internal",
+  "policy": "A2A üstünden yalnız ≤internal görev otomatik çalışır; pii/phi/production reddedilir (Anayasa Md.13.7).",
+  "supported_protocols": ["a2a/1.0-pragmatic", "mcp/1.0"],
+  "endpoints": {
+    "agent_card": "/.well-known/agent-card.json",
+    "task": "/a2a/task",
+    "health": "/health"
+  },
+  "auth": "none (yalnız 127.0.0.1; LAN/uzak için kasıtlı yapılandırma gerekir)",
+  "peers": "a2a_peers.json (varsayılan boş; opsiyonel jenerik peer)"
+}

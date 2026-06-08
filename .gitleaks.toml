@@ -1,0 +1,17 @@
+# Gitleaks yapılandırması — Konsey.
+# Varsayılan kuralları temel al, framework'e özgü false-positive'leri allowlist'le.
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Konsey'e özgü meşru pattern'ler (gerçek secret değil)"
+paths = [
+  # PII/secret TESPİT regex'lerini barındırır (tanım, değer değil):
+  '''orchestrator/gateway\.py''',
+  # Test fixture'ları (kasıtlı sahte secret'lar):
+  '''tests/.*''',
+]
+regexes = [
+  # gateway.py içindeki örnek/placeholder anahtar desenleri:
+  '''sk-proj-abcdef1234567890XYZ''',
+]

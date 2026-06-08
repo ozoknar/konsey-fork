@@ -1,0 +1,7 @@
+{
+  "name": "gunluk-arastirma-ozeti",
+  "task": "Bugün AI/LLM araçları alanında dikkate değer bir teknik gelişme var mı? Kısa, kaynaklı.",
+  "project_hint": "public",
+  "every_minutes": 1440,
+  "enabled": false
+}

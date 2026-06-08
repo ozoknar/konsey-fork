@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+# Konsey deterministik orkestratör (Faz 2) — headless tam döngü
+DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+exec "$DIR/.venv/bin/python" -m orchestrator.run "$@"

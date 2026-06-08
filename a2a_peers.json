@@ -1,0 +1,4 @@
+{
+  "_aciklama": "A2A peer kaydı (opsiyonel/jenerik). Konsey ajanlarının/uzak ajanların A2A ile ilişkisi için. URL boşsa peer inert (çağrılmaz). Bu makine kendi başına çalışır; peer eklemek isteğe bağlıdır.",
+  "peers": {}
+}

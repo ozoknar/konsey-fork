@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+# Konsey audit/memory wrapper — venv python ile konsey_db.py çağırır
+DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+[ -f "$DIR/.env" ] && { set -a; . "$DIR/.env"; set +a; }
+exec "$DIR/.venv/bin/python" "$DIR/bin/konsey_db.py" "$@"

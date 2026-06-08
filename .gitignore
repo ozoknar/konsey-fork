@@ -1,0 +1,44 @@
+# === Runtime / üretilen — ASLA yayınlanmaz ===
+.venv/
+*.duckdb
+*.duckdb.wal
+backups/
+sessions/
+scheduled/*.lock
+scheduled/*.json
+!scheduled/ornek-gunluk-ozet.json
+logs/*.md
+logs/*.log
+!logs/.gitkeep
+__pycache__/
+*.pyc
+*.pyo
+
+# === Kişisel / operasyonel config — LOKAL kalır, yayınlanmaz ===
+# (Yayınlanan generic eşdeğerleri: KONSEY_ANAYASASI_GENEL.md, *.example dosyaları)
+COUNCIL.md
+KONSEY_ANAYASASI.md
+KONSEY_PROJESI_BLUEPRINT.md
+INSTRUCTIONS-yapistir.md
+sprint18-backlog.md
+council.local.*
+.env
+*_archived_*.md
+
+# === OS / editor ===
+.DS_Store
+.idea/
+.vscode/
+
+# === Google Antigravity CLI oturum/token artefaktı — ASLA ===
+.antigravitycli/
+
+# === Internal audit raporu (kimlik bulguları içerir) ===
+PUBLISH_READINESS_*.md
+
+# === Projeye-özel playbook (özel repo içerikleri) — generic örnek hariç ===
+playbooks/*.js
+!playbooks/example-*.js
+
+# === Üretilen dashboard (gerçek oturum verisi içerir) ===
+dashboard.html

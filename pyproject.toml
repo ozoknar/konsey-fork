@@ -1,0 +1,24 @@
+[project]
+name = "konsey"
+version = "0.1.0"
+description = "Çok-ajanlı, kanıt-ağırlıklı orkestrasyon düzeni (Claude + Codex + Google)."
+readme = "README.md"
+requires-python = ">=3.12"
+license = { file = "LICENSE" }
+dependencies = [
+    "langgraph>=0.2",
+    "duckdb>=1.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "ruff>=0.6",
+]
+
+[tool.ruff]
+line-length = 110
+target-version = "py312"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
