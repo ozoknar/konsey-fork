@@ -1,5 +1,9 @@
 # Konsey 🏛
 
+![CI](https://github.com/eMediquality/konsey/actions/workflows/ci.yml/badge.svg)
+![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)
+![Python 3.12+](https://img.shields.io/badge/python-3.12+-blue.svg)
+
 **Çok-ajanlı, kanıt-ağırlıklı orkestrasyon düzeni.** Konsensüs değil **kanıt** karar verir.
 
 Konsey; Claude, Codex ve Google düğümlerini bağımsız çalıştırır, planları çapraz-eleştirir,
@@ -21,9 +25,16 @@ curl -fsSL https://raw.githubusercontent.com/eMediquality/konsey/master/install.
 ```
 Kurulum sırasında **güvenlik seviyesi** ve **opt-in telemetri** sorulur (ikisi de varsayılan-güvenli).
 
-**Veya klonla:**
+> **Belirli sürüme sabitle (önerilen):** `master` en güncel/değişken koddur. Sabit, denetlenebilir
+> kurulum için bir release tag'i kullanın:
+> ```bash
+> curl -fsSL https://raw.githubusercontent.com/eMediquality/konsey/v0.1.0/install.sh | KONSEY_REF=v0.1.0 bash
+> ```
+
+**Veya klonla (önce kodu okumak isteyenler için):**
 ```bash
-git clone <repo-url> konsey && cd konsey
+git clone https://github.com/eMediquality/konsey.git && cd konsey
+less install.sh                    # dilerseniz önce inceleyin (curl|bash'e güvenmeden)
 ./install.sh                       # venv + bağımlılıklar + DB şeması + .env (tek komut)
 ./bin/konsey-run "ilk görevim"     # headless tam döngü
 ```

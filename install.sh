@@ -9,9 +9,10 @@ REPO_URL="${KONSEY_REPO_URL:-https://github.com/eMediquality/konsey.git}"
 
 # --- Uzak bootstrap: repo yoksa klonla ---
 if [ ! -f "schema.sql" ] || [ ! -d "orchestrator" ]; then
-  echo "▸ Konsey klonlanıyor ($REPO_URL)..."
+  REF="${KONSEY_REF:-master}"
+  echo "▸ Konsey klonlanıyor ($REPO_URL @ $REF)..."
   command -v git >/dev/null || { echo "git gerekli."; exit 1; }
-  git clone --depth 1 "$REPO_URL" konsey
+  git clone --depth 1 --branch "$REF" "$REPO_URL" konsey
   cd konsey
 fi
 
