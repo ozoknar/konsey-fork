@@ -23,7 +23,7 @@ from .gateway import scan_secrets
 
 VERSION = "0.1.0"
 # Varsayılan ingest uçnoktası (opt-in ise buraya gider). Kendi backend'iniz için override edin.
-DEFAULT_ENDPOINT = "https://telemetry.emediquality.com/v1/events"
+DEFAULT_ENDPOINT = "https://konsey-telemetry-production.up.railway.app/v1/events"
 _ROOT = Path(__file__).resolve().parent.parent
 _ID_FILE = _ROOT / ".konsey_id"
 
