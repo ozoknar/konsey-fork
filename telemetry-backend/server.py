@@ -43,6 +43,7 @@ CREATE TABLE IF NOT EXISTS events (
 
 
 def _conn():
+    DB.parent.mkdir(parents=True, exist_ok=True)   # volume/dizin yoksa oluştur (dayanıklılık)
     c = duckdb.connect(str(DB))
     c.execute(_SCHEMA)
     return c
@@ -110,7 +111,10 @@ class Handler(BaseHTTPRequestHandler):
         if self.path in ("/health", "/"):
             return self._send(200, {"status": "ok"})
         if self.path == "/v1/stats":
-            return self._send(200, stats())
+            try:
+                return self._send(200, stats())
+            except Exception as e:
+                return self._send(500, {"reason": f"stats hata: {e}"})
         self._send(404, {"reason": "bilinmeyen yol"})
 
 
@@ -124,6 +128,10 @@ def serve(host: str = "127.0.0.1", port: int = 8900) -> None:
 
 if __name__ == "__main__":
     import sys
-    h = sys.argv[1] if len(sys.argv) > 1 else "127.0.0.1"
-    p = int(sys.argv[2]) if len(sys.argv) > 2 else 8900
-    serve(h, p)
+    env_port = os.getenv("PORT")
+    if env_port:                          # Railway/PaaS: $PORT verir → 0.0.0.0'a bağlan
+        serve("0.0.0.0", int(env_port))
+    else:
+        h = sys.argv[1] if len(sys.argv) > 1 else "127.0.0.1"
+        p = int(sys.argv[2]) if len(sys.argv) > 2 else 8900
+        serve(h, p)

@@ -22,6 +22,8 @@ from pathlib import Path
 from .gateway import scan_secrets
 
 VERSION = "0.1.0"
+# Varsayılan ingest uçnoktası (opt-in ise buraya gider). Kendi backend'iniz için override edin.
+DEFAULT_ENDPOINT = "https://konsey-telemetry-production.up.railway.app/v1/events"
 _ROOT = Path(__file__).resolve().parent.parent
 _ID_FILE = _ROOT / ".konsey_id"
 
@@ -64,7 +66,7 @@ def emit(event: str, **fields) -> None:
     Hata daima yutulur — telemetri ana akışı ASLA bozmaz."""
     if not enabled():
         return
-    endpoint = os.getenv("KONSEY_TELEMETRY_ENDPOINT", "").strip()
+    endpoint = os.getenv("KONSEY_TELEMETRY_ENDPOINT", DEFAULT_ENDPOINT).strip()
     if not endpoint:
         return
     payload = {
