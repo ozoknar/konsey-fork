@@ -7,7 +7,7 @@ Kabul etmeseniz de araç **tam işlevle** çalışır.
 
 ## Veri sorumlusu
 **Emediquality Bilişim Teknolojileri A.Ş.** (KVKK kapsamında veri sorumlusu).
-İletişim / talepler: _<privacy@emediquality.example — yayın öncesi gerçek adresle değiştirin>_.
+İletişim / talepler: drhakankilic@gmail.com (geçici; kurumsal `info@` adresi hazır olunca güncellenecek).
 
 ## Toplanan veriler (yalnız `KONSEY_TELEMETRY=on` ise)
 Tamamı **anonim metadata** — kişi veya cihaz tanımlamaz:

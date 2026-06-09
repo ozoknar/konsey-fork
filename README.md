@@ -17,7 +17,7 @@ PREFLIGHT → PLAN → CRITIQUE → SYNTHESIZE → EXECUTE → VERIFY → DECIDE
 
 **Tek komut (uzak):**
 ```bash
-curl -fsSL https://raw.githubusercontent.com/<ORG>/konsey/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/eMediquality/konsey/master/install.sh | bash
 ```
 Kurulum sırasında **güvenlik seviyesi** ve **opt-in telemetri** sorulur (ikisi de varsayılan-güvenli).
 

@@ -5,7 +5,7 @@
 # Etkileşimsiz (CI): KONSEY_ASSUME_YES=1 ve istenirse KONSEY_SECURITY_LEVEL / KONSEY_TELEMETRY önceden set.
 set -euo pipefail
 
-REPO_URL="${KONSEY_REPO_URL:-https://github.com/<ORG>/konsey.git}"   # yayında gerçek URL ile değiştir
+REPO_URL="${KONSEY_REPO_URL:-https://github.com/eMediquality/konsey.git}"
 
 # --- Uzak bootstrap: repo yoksa klonla ---
 if [ ! -f "schema.sql" ] || [ ! -d "orchestrator" ]; then
