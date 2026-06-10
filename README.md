@@ -173,5 +173,9 @@ a user in Turkey sees Turkish. Override with `KONSEY_LANG=tr|en`.
 | Append-only audit | `orchestrator/audit.py` · `schema.sql` |
 | Decision logic | `orchestrator/decide.py` |
 
+## Docs
+[Architecture](./docs/architecture.md) · [Examples](./examples/) · [Connectors](./CONNECTORS.md) ·
+[Privacy](./PRIVACY.md) · [Changelog](./CHANGELOG.md)
+
 ## Contributing & Security
 See [CONTRIBUTING.md](./CONTRIBUTING.md) · [SECURITY.md](./SECURITY.md). License: [MIT](./LICENSE).

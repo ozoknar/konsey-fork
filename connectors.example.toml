@@ -7,14 +7,15 @@ enabled = false
 auth_env = "TELEGRAM_BOT_TOKEN"      # @BotFather'dan bot token; .env'e koyun
 # allowed_chats = ["123456789"]      # opsiyonel: yalnız bu chat_id'lerden gelen mesaj işlenir
 
+[connectors.notion]
+enabled = false
+auth_env = "NOTION_TOKEN"             # internal integration token; ayrıca NOTION_DATABASE_ID gerekir
+# DB'deki her yeni sayfanın başlığı görev olur; sonuç sayfaya yorum olarak yazılır.
+
 # --- Yol haritası (henüz uygulanmadı; bkz. CONNECTORS.md) ---
 # [connectors.slack]
 # enabled = false
 # auth_env = "SLACK_BOT_TOKEN"        # xoxb-... + SLACK_APP_TOKEN (Socket Mode) + signing secret
-#
-# [connectors.notion]
-# enabled = false
-# auth_env = "NOTION_TOKEN"           # internal integration token + NOTION_DATABASE_ID (polling)
 #
 # [connectors.whatsapp]
 # enabled = false

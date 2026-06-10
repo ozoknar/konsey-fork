@@ -25,9 +25,12 @@ def main(argv: list[str] | None = None) -> None:
     if name == "telegram":
         from . import telegram
         telegram.run(allowed_chats=spec.get("allowed_chats"))
+    elif name == "notion":
+        from . import notion
+        notion.run()
     else:
         print(f"Connector '{name}' henüz uygulanmadı "
-              "(yol haritası: slack, notion, whatsapp). Bkz. CONNECTORS.md")
+              "(yol haritası: slack, whatsapp). Bkz. CONNECTORS.md")
 
 
 if __name__ == "__main__":

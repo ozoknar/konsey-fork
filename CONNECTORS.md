@@ -11,10 +11,10 @@ human approval is required. The same gate that protects the CLI protects every c
 
 | Platform | Status | Mechanism | Difficulty |
 |---|---|---|---|
-| **Telegram** | ✅ implemented (MVP) | Bot API `getUpdates` long-poll | easiest |
-| Slack | 🟡 roadmap | App + Events API / Socket Mode | medium |
-| Notion | 🟡 roadmap | REST polling a database | medium |
-| WhatsApp | 🟡 roadmap | Meta Cloud API + webhook | hardest |
+| **Telegram** | ✅ implemented | Bot API `getUpdates` long-poll | easiest |
+| **Notion** | ✅ implemented | REST polling a database → comment reply | medium |
+| Slack | 🟡 roadmap | App + Events API / Socket Mode (needs `slack_sdk`) | medium |
+| WhatsApp | 🟡 roadmap | Meta Cloud API + public webhook | hardest |
 
 ## Setup
 

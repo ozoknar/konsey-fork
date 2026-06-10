@@ -162,5 +162,9 @@ kullanıcı Türkçe görür. `KONSEY_LANG=tr|en` ile zorlanır.
 | Append-only audit | `orchestrator/audit.py` · `schema.sql` |
 | Karar mantığı | `orchestrator/decide.py` |
 
+## Dokümanlar
+[Mimari](./docs/architecture.md) · [Örnekler](./examples/) · [Connector'lar](./CONNECTORS.md) ·
+[Gizlilik](./PRIVACY.md) · [Changelog](./CHANGELOG.md)
+
 ## Katkı & Güvenlik
 Bkz. [CONTRIBUTING.md](./CONTRIBUTING.md) · [SECURITY.md](./SECURITY.md). Lisans: [MIT](./LICENSE).
