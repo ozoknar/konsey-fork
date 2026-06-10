@@ -52,3 +52,6 @@ konsey.providers.toml
 # === Telemetri backend DB (lokal) ===
 telemetry-backend/*.duckdb
 telemetry-backend/*.duckdb.wal
+
+# === Kullanıcıya özel connector config (lokal) ===
+connectors.toml

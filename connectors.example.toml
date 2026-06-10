@@ -1,0 +1,21 @@
+# Konsey connectors — hangi mesaj platformlarına bağlanacağınızı tanımlayın (opt-in).
+# cp connectors.example.toml connectors.toml ; enabled=true yapın + auth_env'i set edin.
+# Sağlayıcılar gibi: auth_env ortam değişkeni yoksa connector graceful "devre dışı" sayılır.
+
+[connectors.telegram]
+enabled = false
+auth_env = "TELEGRAM_BOT_TOKEN"      # @BotFather'dan bot token; .env'e koyun
+# allowed_chats = ["123456789"]      # opsiyonel: yalnız bu chat_id'lerden gelen mesaj işlenir
+
+# --- Yol haritası (henüz uygulanmadı; bkz. CONNECTORS.md) ---
+# [connectors.slack]
+# enabled = false
+# auth_env = "SLACK_BOT_TOKEN"        # xoxb-... + SLACK_APP_TOKEN (Socket Mode) + signing secret
+#
+# [connectors.notion]
+# enabled = false
+# auth_env = "NOTION_TOKEN"           # internal integration token + NOTION_DATABASE_ID (polling)
+#
+# [connectors.whatsapp]
+# enabled = false
+# auth_env = "WHATSAPP_TOKEN"         # Meta Cloud API: phone-number-id + verify_token + public webhook

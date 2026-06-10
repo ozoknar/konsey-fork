@@ -27,6 +27,20 @@ role = "researcher"
 provider = "google"
 command = ["agy", "--print-timeout", "{timeout}s", "-p", "{prompt}"]
 
+# --- Yerel model (Ollama) — veri CİHAZDAN ÇIKMAZ; PHI/gizli/çevrimdışı işler için ideal ---
+# Kurulum: https://ollama.com → `ollama pull llama3.1`. Aktif etmek için enabled=true.
+[providers.ollama]
+enabled = false
+role = "architect"
+provider = "local"
+command = ["ollama", "run", "llama3.1", "{prompt}"]
+
+# --- Yerel model (llama.cpp / LM Studio OpenAI-uyumlu sunucu) örneği ---
+# [providers.local-llm]
+# enabled = false
+# role = "critic"
+# command = ["curl", "-s", "http://127.0.0.1:1234/v1/chat/completions", "-d", "{prompt}"]
+
 # --- Örnek: API-key ile çalışan özel bir sağlayıcı eklemek ---
 # [providers.my-llm]
 # enabled = false

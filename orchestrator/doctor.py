@@ -1,5 +1,6 @@
 """konsey doctor — kurulum, sağlayıcı, auth, güvenlik ve telemetri durumunu gösterir.
 
+Çıktı locale-farkında (i18n): sistem dili `tr` ise Türkçe, değilse İngilizce.
 Kullanıcı "gerçekten kuruldu mu, hangi YZ ürünlerim hazır?" sorusunu tek bakışta yanıtlar.
 """
 from __future__ import annotations
@@ -9,14 +10,16 @@ import shutil
 
 from . import telemetry
 from .adapters import available, load_providers
+from .i18n import t
 
 
 def report() -> str:
-    lines = ["Konsey Doctor — kurulum durumu", "=" * 34]
-    lines.append(f"Güvenlik seviyesi : {os.getenv('KONSEY_SECURITY_LEVEL', 'medium')}")
-    lines.append(f"Telemetri         : {'AÇIK (opt-in)' if telemetry.enabled() else 'kapalı'}")
+    lines = [t("doctor.title"), "=" * 34]
+    lines.append(t("doctor.security", level=os.getenv("KONSEY_SECURITY_LEVEL", "medium")))
+    state = t("doctor.tel_on") if telemetry.enabled() else t("doctor.tel_off")
+    lines.append(t("doctor.telemetry", state=state))
     lines.append("")
-    lines.append("Sağlayıcılar (kullandığınız YZ ürünleri):")
+    lines.append(t("doctor.providers"))
 
     provs = load_providers()
     avail = available()
@@ -24,24 +27,23 @@ def report() -> str:
         cmd0 = (spec.get("command") or ["?"])[0]
         auth_env = spec.get("auth_env")
         if not spec.get("enabled", True):
-            status = "— devre dışı"
+            status = t("doctor.disabled")
         elif shutil.which(cmd0) is None:
-            status = f"✗ CLI yok ({cmd0})"
+            status = t("doctor.no_cli", cmd=cmd0)
         elif auth_env and not os.getenv(auth_env):
-            status = f"✗ auth eksik ({auth_env})"
+            status = t("doctor.no_auth", env=auth_env)
         else:
-            status = "✓ hazır"
+            status = "✓ " + t("doctor.ready")
         lines.append(f"  {name:12s} [{spec.get('role', ''):10s}] {status}")
 
     n_ok = sum(1 for v in avail.values() if v)
     lines.append("")
     if n_ok == 0:
-        lines.append("⚠ Hiç sağlayıcı hazır değil — bir YZ CLI kurun (claude/codex/agy) "
-                     "veya konsey.providers.toml düzenleyin.")
+        lines.append("⚠ " + t("doctor.none"))
     elif n_ok == 1:
-        lines.append("ℹ Solo mod (1 sağlayıcı hazır). Çapraz-doğrulama için 2+ önerilir.")
+        lines.append("ℹ " + t("doctor.solo"))
     else:
-        lines.append(f"✓ {n_ok} sağlayıcı hazır — tam çapraz-doğrulama mümkün.")
+        lines.append("✓ " + t("doctor.multi", n=n_ok))
     return "\n".join(lines)
 
 
