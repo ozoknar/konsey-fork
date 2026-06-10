@@ -2,7 +2,7 @@
 
 All notable changes to Konsey. Format loosely follows [Keep a Changelog](https://keepachangelog.com).
 
-## [Unreleased]
+## [0.2.0] — 2026-06-10
 ### Added
 - **Connectors** — messaging-platform integrations (opt-in, config-driven), all four implemented:
   **Telegram** (Bot API), **Notion** (DB polling), **Slack** (Socket Mode, needs `slack_sdk`),
