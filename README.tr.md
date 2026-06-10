@@ -19,6 +19,18 @@ PREFLIGHT → PLAN → CRITIQUE → SYNTHESIZE → EXECUTE → VERIFY → DECIDE
 
 ---
 
+## Neden Konsey?
+
+- ⚖️ **Konsensüs değil kanıt** — bağımsız sağlayıcılar çapraz-doğrular; üreten kendi çıktısını onaylayamaz.
+- 🔌 **Vendor-neutral** — Claude, Codex, Gemini veya kendi modeliniz — config-driven, tek satırda değiştirin.
+- 🔒 **Yerel-öncelik** — Ollama ile tamamen cihazda çalışın; **veri makineden çıkmaz** (PHI/regüle işler için ideal).
+- 🛡️ **Katmanlı, opt-in güvenlik** — strict/medium/weak seviyeleri, secret + PHI taraması, append-only audit.
+- 💬 **Kullanıcıya onun kanalında** — Telegram, Notion, Slack & WhatsApp connector'ları, **her kanalda aynı risk-gate**.
+- 🌍 **İki dilli** — İngilizce/Türkçe, locale-farkında (`KONSEY_LANG`).
+- 🪶 **Küçük & denetlenebilir** — iki çekirdek bağımlılık (`langgraph` + `duckdb`), tek-komut kurulum, yeşil CI, MIT.
+
+---
+
 ## Hızlı başlangıç
 
 **Tek komut (uzak):**
@@ -105,6 +117,15 @@ Sağlayıcılar (kullandığınız YZ ürünleri):
   gemini   [researcher] ✗ auth eksik (GEMINI_API_KEY)
 ```
 
+**Yerel modeller** (Ollama, llama.cpp, LM Studio) birinci sınıf — sadece bir sağlayıcı kaydı.
+Veri **cihazdan çıkmaz** (PHI/çevrimdışı işler için ideal):
+```toml
+[providers.ollama]
+enabled = true
+role = "architect"
+command = ["ollama", "run", "llama3.1", "{prompt}"]
+```
+
 ## Gizlilik & telemetri
 Varsayılan **kapalı**. Opt-in açarsanız yalnız **anonim metadata** (özellik kullanımı, hata
 kodu, sürüm) gönderilir — **asla görev içeriği/PHI/secret**. Detay + opt-out: [PRIVACY.md](./PRIVACY.md).
@@ -136,9 +157,10 @@ A2A üstünden yalnız ≤internal görevler otomatik çalışır; pii/phi/produ
 
 ## Connector'lar (sohbet platformları)
 
-Konseyi bir sohbet uygulamasından sürün — **Telegram** ve **Notion** bugün çalışıyor; Slack/WhatsApp
-yol haritasında. Opt-in + kimlik-gated ve **aynı risk-gate geçerli**: phi/production her kanalda
-reddedilir. Bkz. [CONNECTORS.md](./CONNECTORS.md).
+Konseyi bir sohbet uygulamasından sürün — **Telegram, Notion, Slack ve WhatsApp** connector'ları.
+Hepsi opt-in + kimlik-gated, **her kanalda aynı risk-gate** (phi/production reddedilir). Telegram &
+Notion maintainer-test edildi; Slack & WhatsApp kod-tam (WhatsApp webhook'ları HMAC-imza doğrulamalı).
+Bkz. [CONNECTORS.md](./CONNECTORS.md).
 
 ```bash
 cp connectors.example.toml connectors.toml   # telegram'ı aç + .env'e TELEGRAM_BOT_TOKEN

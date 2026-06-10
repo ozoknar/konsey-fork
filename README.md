@@ -19,6 +19,18 @@ PREFLIGHT → PLAN → CRITIQUE → SYNTHESIZE → EXECUTE → VERIFY → DECIDE
 
 ---
 
+## Why Konsey?
+
+- ⚖️ **Evidence over consensus** — independent providers cross-validate; a producer never verifies its own output.
+- 🔌 **Vendor-neutral** — Claude, Codex, Gemini, or your own — config-driven, swap any provider in one line.
+- 🔒 **Local-first option** — run entirely on-device with Ollama; **no data leaves your machine** (ideal for PHI/regulated work).
+- 🛡️ **Layered, opt-in safety** — strict/medium/weak levels, secret + PHI scanning, append-only audit trail.
+- 💬 **Meet users where they are** — Telegram, Notion, Slack & WhatsApp connectors, with the **same risk gate on every channel**.
+- 🌍 **Bilingual** — English/Turkish, locale-aware (`KONSEY_LANG`).
+- 🪶 **Tiny & auditable** — two core deps (`langgraph` + `duckdb`), one-command install, green CI, MIT.
+
+---
+
 ## Quick start
 
 **One command (remote):**
@@ -147,9 +159,10 @@ Only ≤internal tasks run automatically over A2A; pii/phi/production are reject
 
 ## Connectors (chat platforms)
 
-Drive the council from a chat app — **Telegram** and **Notion** work today; Slack/WhatsApp are on
-the roadmap. Opt-in + credential-gated, and the **same risk gate applies**: phi/production tasks
-are refused on every channel. See [CONNECTORS.md](./CONNECTORS.md).
+Drive the council from a chat app — **Telegram, Notion, Slack, and WhatsApp** connectors. All
+opt-in + credential-gated, with the **same risk gate on every channel** (phi/production refused).
+Telegram & Notion are maintainer-tested; Slack & WhatsApp are code-complete (WhatsApp webhooks are
+HMAC-signature-verified). See [CONNECTORS.md](./CONNECTORS.md).
 
 ```bash
 cp connectors.example.toml connectors.toml   # enable telegram + set TELEGRAM_BOT_TOKEN in .env
