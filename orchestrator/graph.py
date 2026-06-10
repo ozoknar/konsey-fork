@@ -17,6 +17,7 @@ from . import audit
 from .adapters import ADAPTERS, available, pick
 from .decide import decide
 from .gateway import preflight as gw_preflight
+from .i18n import t
 
 MAX_VERIFY_RETRIES = 2
 
@@ -227,30 +228,30 @@ def report(s: S) -> dict:
     dec = s.get("decision", {})
     elapsed = int(time.time() - s.get("t_start", time.time()))
     lines = [
-        f"# Konsey Raporu — {s['task']}",
-        f"risk={s.get('risk')} · süre={elapsed}s · çağrı={s.get('calls',0)} · "
+        t("report.title", task=s['task']),
+        f"risk={s.get('risk')} · {elapsed}s · calls={s.get('calls',0)} · "
         f"tool_failures={s.get('tool_failures',0)} · session={s.get('session_id','')[:8]}",
         "",
     ]
     if s.get("blocked"):
-        lines += [f"⛔ GATEWAY BLOKLADI: {s.get('block_reason')}", ""]
+        lines += [t("report.gateway", reason=s.get('block_reason')), ""]
     if s.get("killed") and not s.get("blocked"):
-        lines += [f"🛑 KILL SWITCH: {s.get('kill_reason')}", ""]
+        lines += [t("report.kill", reason=s.get('kill_reason')), ""]
     if not _dead(s):
         lines += [
-            f"**Düğümler:** {', '.join(s.get('plans', {}).keys())} ({s.get('providers_ok',0)} ok)",
+            t("report.nodes", nodes=', '.join(s.get('plans', {}).keys()), n=s.get('providers_ok', 0)),
             "",
-            "## Nihai çıktı", (s.get("execution") or "")[:3000], "",
-            f"## Doğrulama\n{s.get('verify_verdict','(yok)')[:800]}", "",
+            t("report.output"), (s.get("execution") or "")[:3000], "",
+            f"{t('report.verify')}\n{s.get('verify_verdict', '(—)')[:800]}", "",
         ]
     if s.get("dissents"):
         lines += ["## Dissent"] + [f"- [{d['agent']}] {d['rationale'][:300]}" for d in s["dissents"]] + [""]
     lines += [
-        "## Karar",
+        t("report.decision"),
         f"- confidence: **{dec.get('confidence')}**",
-        f"- insan onayı gerekli mi: **{'EVET' if dec.get('human_required') else 'hayır'}**",
-        f"- gerekçe: {dec.get('rationale')}",
-        f"- kanıt sayısı: {len(s.get('evidence', []))}",
+        t("report.human", v=(t("report.yes") if dec.get('human_required') else t("report.no"))),
+        t("report.rationale", r=dec.get('rationale')),
+        t("report.evidence", n=len(s.get('evidence', []))),
     ]
     return {"report": "\n".join(lines)}
 

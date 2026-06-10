@@ -5,6 +5,27 @@
 # Etkileşimsiz (CI): KONSEY_ASSUME_YES=1 ve istenirse KONSEY_SECURITY_LEVEL / KONSEY_TELEMETRY önceden set.
 set -euo pipefail
 
+# i18n: sistem locale tr ise Türkçe, değilse İngilizce (KONSEY_LANG override).
+case "${KONSEY_LANG:-${LC_ALL:-${LC_MESSAGES:-${LANG:-en}}}}" in tr*|TR*) _L=tr;; *) _L=en;; esac
+msg() { case "$1:$_L" in
+  done:tr)       echo "✓ Kurulum tamam. Dene:";;
+  done:*)        echo "✓ Install complete. Try:";;
+  sec.head:tr)   echo "Güvenlik seviyesi seçin (akışkanlık ↔ güvenlik):";;
+  sec.head:*)    echo "Choose a security level (fluidity ↔ safety):";;
+  sec.s:tr)      echo "  1) strict  — secret+PHI bloklar, ≥2 sağlayıcı, insan onayı";;
+  sec.s:*)       echo "  1) strict  — blocks secret+PHI, ≥2 providers, human approval";;
+  sec.m:tr)      echo "  2) medium  — secret bloklar, PHI uyarır (önerilen)";;
+  sec.m:*)       echo "  2) medium  — blocks secret, warns on PHI (recommended)";;
+  sec.w:tr)      echo "  3) weak    — yalnız uyarır, max akışkanlık";;
+  sec.w:*)       echo "  3) weak    — warn only, max fluidity";;
+  sec.pick:tr)   printf "Seçim [2]: ";;     sec.pick:*) printf "Choice [2]: ";;
+  tel.intro:tr)  echo "Anonim kullanım verisi paylaşımı (opt-in) — ürünü geliştirmemize yardım eder.";;
+  tel.intro:*)   echo "Share anonymous usage data (opt-in) — helps us improve the product.";;
+  tel.what:tr)   echo "Toplanan: yalnız anonim metadata. ASLA görev içeriği/PHI/secret. Detay: PRIVACY.md.";;
+  tel.what:*)    echo "Collected: anonymous metadata only. NEVER task content/PHI/secrets. See PRIVACY.md.";;
+  tel.ask:tr)    printf "Paylaşımı açayım mı? [e/H]: ";; tel.ask:*) printf "Enable sharing? [y/N]: ";;
+esac; }
+
 REPO_URL="${KONSEY_REPO_URL:-https://github.com/eMediquality/konsey.git}"
 
 # --- Uzak bootstrap: repo yoksa klonla ---
@@ -55,17 +76,12 @@ if [ ! -f .env ]; then
   # curl|bash'te stdin script'tir → /dev/tty üzerinden sor (yoksa varsayılanlar).
   if [ -e /dev/tty ] && [ "${KONSEY_ASSUME_YES:-0}" != "1" ]; then
     echo
-    echo "Güvenlik seviyesi seçin (akışkanlık ↔ güvenlik):"
-    echo "  1) strict  — secret+PHI bloklar, ≥2 sağlayıcı, insan onayı"
-    echo "  2) medium  — secret bloklar, PHI uyarır (önerilen)"
-    echo "  3) weak    — yalnız uyarır, max akışkanlık"
-    read -rp "Seçim [2]: " s < /dev/tty; case "$s" in 1) LEVEL=strict;; 3) LEVEL=weak;; *) LEVEL=medium;; esac
+    msg sec.head; msg sec.s; msg sec.m; msg sec.w
+    msg sec.pick; read -r s < /dev/tty; case "$s" in 1) LEVEL=strict;; 3) LEVEL=weak;; *) LEVEL=medium;; esac
 
     echo
-    echo "Anonim kullanım verisi paylaşımı (opt-in) — ürünü geliştirmemize yardım eder."
-    echo "Toplanan: yalnız anonim metadata (özellik kullanımı, hata kodu, sürüm)."
-    echo "ASLA: görev içeriği, PHI, secret. Detay: PRIVACY.md. Reddetseniz de araç tam çalışır."
-    read -rp "Paylaşımı açayım mı? [e/H]: " t < /dev/tty
+    msg tel.intro; msg tel.what
+    msg tel.ask; read -r t < /dev/tty
     case "$t" in [eEyY]*) TELEM=on;; *) TELEM=off;; esac
   fi
 
@@ -77,6 +93,6 @@ if [ ! -f .env ]; then
 fi
 
 echo
-echo "✓ Kurulum tamam. Dene:"
-echo "    ./bin/konsey-run \"ilk görevim\""
+msg done
+echo "    ./bin/konsey-run \"my first task\""
 echo "    ./bin/konsey recent"

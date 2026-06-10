@@ -28,6 +28,20 @@ MESSAGES: dict[str, dict[str, str]] = {
                          "tr": "Solo mod (1 sağlayıcı hazır). Çapraz-doğrulama için 2+ önerilir."},
     "doctor.multi":     {"en": "{n} providers ready - full cross-validation possible.",
                          "tr": "{n} sağlayıcı hazır — tam çapraz-doğrulama mümkün."},
+    # --- run report ---
+    "report.title":     {"en": "# Konsey Report — {task}", "tr": "# Konsey Raporu — {task}"},
+    "report.gateway":   {"en": "⛔ GATEWAY BLOCKED: {reason}", "tr": "⛔ GATEWAY BLOKLADI: {reason}"},
+    "report.kill":      {"en": "🛑 KILL SWITCH: {reason}", "tr": "🛑 KILL SWITCH: {reason}"},
+    "report.nodes":     {"en": "**Nodes:** {nodes} ({n} ok)", "tr": "**Düğümler:** {nodes} ({n} ok)"},
+    "report.output":    {"en": "## Final output", "tr": "## Nihai çıktı"},
+    "report.verify":    {"en": "## Verification", "tr": "## Doğrulama"},
+    "report.decision":  {"en": "## Decision", "tr": "## Karar"},
+    "report.human":     {"en": "- human approval needed: **{v}**",
+                         "tr": "- insan onayı gerekli mi: **{v}**"},
+    "report.yes":       {"en": "YES", "tr": "EVET"},
+    "report.no":        {"en": "no", "tr": "hayır"},
+    "report.rationale": {"en": "- rationale: {r}", "tr": "- gerekçe: {r}"},
+    "report.evidence":  {"en": "- evidence count: {n}", "tr": "- kanıt sayısı: {n}"},
 }
 
 
