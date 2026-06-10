@@ -13,8 +13,11 @@ human approval is required. The same gate that protects the CLI protects every c
 |---|---|---|---|
 | **Telegram** | ✅ implemented | Bot API `getUpdates` long-poll | easiest |
 | **Notion** | ✅ implemented | REST polling a database → comment reply | medium |
-| Slack | 🟡 roadmap | App + Events API / Socket Mode (needs `slack_sdk`) | medium |
-| WhatsApp | 🟡 roadmap | Meta Cloud API + public webhook | hardest |
+| **Slack** | ✅ implemented¹ | Socket Mode (no public URL); needs `pip install slack_sdk` | medium |
+| **WhatsApp** | ✅ implemented¹ | Meta Cloud API webhook (stdlib server) | hardest |
+
+¹ Code complete; **not yet live-tested by the maintainer** — Slack needs a Slack app + `slack_sdk`,
+WhatsApp needs a Meta Business account + public HTTPS webhook. They run gracefully (opt-in, no creds → no-op).
 
 ## Setup
 

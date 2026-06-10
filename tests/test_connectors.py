@@ -50,3 +50,19 @@ def test_notion_seen_persists(monkeypatch, tmp_path):
     monkeypatch.setattr(notion, "_SEEN_FILE", tmp_path / "seen.json")
     notion._save_seen({"page-a", "page-b"})
     assert notion._load_seen() == {"page-a", "page-b"}
+
+
+def test_slack_disabled_without_token(monkeypatch, capsys):
+    monkeypatch.delenv("SLACK_BOT_TOKEN", raising=False)
+    monkeypatch.delenv("SLACK_APP_TOKEN", raising=False)
+    from connectors import slack
+    slack.run(bot_token=None, app_token=None)
+    assert "devre dışı" in capsys.readouterr().out
+
+
+def test_whatsapp_disabled_without_creds(monkeypatch, capsys):
+    for v in ("WHATSAPP_TOKEN", "WHATSAPP_PHONE_ID", "WHATSAPP_VERIFY_TOKEN"):
+        monkeypatch.delenv(v, raising=False)
+    from connectors import whatsapp
+    whatsapp.run()
+    assert "devre dışı" in capsys.readouterr().out

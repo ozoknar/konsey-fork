@@ -4,9 +4,12 @@ All notable changes to Konsey. Format loosely follows [Keep a Changelog](https:/
 
 ## [Unreleased]
 ### Added
-- **Connectors** — messaging-platform integrations (opt-in, config-driven). **Telegram** (Bot API
-  long-poll) and **Notion** (DB polling → comment reply) implemented; Slack/WhatsApp roadmap.
-  Same risk gate on every channel. See [CONNECTORS.md](./CONNECTORS.md).
+- **Connectors** — messaging-platform integrations (opt-in, config-driven), all four implemented:
+  **Telegram** (Bot API), **Notion** (DB polling), **Slack** (Socket Mode, needs `slack_sdk`),
+  **WhatsApp** (Meta Cloud API webhook). Slack/WhatsApp are code-complete but not yet
+  maintainer-live-tested (need external accounts). Same risk gate on every channel. See
+  [CONNECTORS.md](./CONNECTORS.md).
+- **`--json` output** + production exit codes for `konsey-run` (2=blocked/killed, 3=human-needed).
 - **Local models** — Ollama / llama.cpp / LM Studio as first-class providers (data stays on-device;
   ideal for PHI/offline). See `konsey.providers.example.toml`.
 - **i18n** — locale-aware CLI (English default; Turkish when system locale is `tr`; `KONSEY_LANG`

@@ -22,14 +22,18 @@ dev = [
     "pytest>=8.0",
     "ruff>=0.6",
 ]
+connectors = [
+    "slack_sdk>=3.0",   # yalnız Slack connector için (opsiyonel)
+]
 
 [tool.ruff]
 line-length = 110
 target-version = "py312"
 
 [tool.ruff.lint.per-file-ignores]
-"bin/konsey_db.py" = ["E702"]   # argparse kurulumunda kompakt ; stili (kasıtlı)
-"tests/*" = ["E402"]            # test modülleri dinamik import-yükleme yapar
+"bin/konsey_db.py" = ["E702"]        # argparse kurulumunda kompakt ; stili (kasıtlı)
+"connectors/whatsapp.py" = ["E702"]  # http.server yanıt satırları (kompakt ; kasıtlı)
+"tests/*" = ["E402"]                 # test modülleri dinamik import-yükleme yapar
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

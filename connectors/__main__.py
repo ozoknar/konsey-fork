@@ -18,9 +18,14 @@ def _run_one(name: str, spec: dict) -> None:
     elif name == "notion":
         from . import notion
         notion.run()
+    elif name == "slack":
+        from . import slack
+        slack.run()
+    elif name == "whatsapp":
+        from . import whatsapp
+        whatsapp.run()
     else:
-        print(f"Connector '{name}' henüz uygulanmadı (yol haritası: slack, whatsapp). "
-              "Bkz. CONNECTORS.md")
+        print(f"Bilinmeyen connector '{name}'. Bkz. CONNECTORS.md")
 
 
 def main(argv: list[str] | None = None) -> None:

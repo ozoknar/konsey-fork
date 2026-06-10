@@ -12,11 +12,12 @@ enabled = false
 auth_env = "NOTION_TOKEN"             # internal integration token; ayrıca NOTION_DATABASE_ID gerekir
 # DB'deki her yeni sayfanın başlığı görev olur; sonuç sayfaya yorum olarak yazılır.
 
-# --- Yol haritası (henüz uygulanmadı; bkz. CONNECTORS.md) ---
-# [connectors.slack]
-# enabled = false
-# auth_env = "SLACK_BOT_TOKEN"        # xoxb-... + SLACK_APP_TOKEN (Socket Mode) + signing secret
-#
-# [connectors.whatsapp]
-# enabled = false
-# auth_env = "WHATSAPP_TOKEN"         # Meta Cloud API: phone-number-id + verify_token + public webhook
+[connectors.slack]
+enabled = false
+auth_env = "SLACK_BOT_TOKEN"          # ayrıca SLACK_APP_TOKEN (Socket Mode). `pip install slack_sdk`
+# Socket Mode → public URL gerekmez.
+
+[connectors.whatsapp]
+enabled = false
+auth_env = "WHATSAPP_TOKEN"           # ayrıca WHATSAPP_PHONE_ID + WHATSAPP_VERIFY_TOKEN
+# Meta Cloud API webhook → public HTTPS URL'i Meta'ya kaydetmeniz gerekir.
