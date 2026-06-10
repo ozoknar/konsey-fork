@@ -41,3 +41,12 @@ def test_notion_title_extraction():
     page = {"properties": {"Name": {"type": "title",
             "title": [{"plain_text": "iki sayıyı topla"}]}}}
     assert notion._title_of(page) == "iki sayıyı topla"
+    assert notion._title_of({"properties": {"X": {"type": "rich_text"}}}) == ""   # başlık yok
+
+
+def test_notion_seen_persists(monkeypatch, tmp_path):
+    """İdempotentlik fix: seen seti diske yazılır → yeniden başlatmada spam yok."""
+    from connectors import notion
+    monkeypatch.setattr(notion, "_SEEN_FILE", tmp_path / "seen.json")
+    notion._save_seen({"page-a", "page-b"})
+    assert notion._load_seen() == {"page-a", "page-b"}

@@ -2,9 +2,11 @@
 
 Kurulum: notion.com → internal integration → NOTION_TOKEN; hedef DB'yi integration ile
 paylaş; NOTION_DATABASE_ID. Akış: DB'deki her yeni sayfanın başlığı → run_council →
-sonucu sayfaya yorum olarak yazar. Görülen sayfa id'leri tekrar işlenmez (in-memory).
+sonucu sayfaya yorum olarak yazar.
 
-Bağımlılık yok (stdlib urllib). Push yok → tick aralığında yoklar.
+İdempotent: işlenen sayfa id'leri DİSKE yazılır (yeniden başlatmada tekrar/spam yok).
+Yalnız başarılı yorum sonrası "görüldü" işaretlenir → hata sonrası tekrar denenir.
+Bağımlılık yok (stdlib urllib). Push yok → poll aralığında yoklar; tam pagination.
 """
 from __future__ import annotations
 
@@ -12,11 +14,13 @@ import json
 import os
 import time
 import urllib.request
+from pathlib import Path
 
 from .base import run_council
 
 _API = "https://api.notion.com/v1"
 _VER = "2022-06-28"
+_SEEN_FILE = Path(__file__).resolve().parent.parent / ".konsey_notion_seen.json"
 
 
 def _req(token: str, method: str, path: str, body: dict | None = None) -> dict:
@@ -37,38 +41,66 @@ def _title_of(page: dict) -> str:
     return ""
 
 
+def _load_seen() -> set[str]:
+    try:
+        return set(json.loads(_SEEN_FILE.read_text(encoding="utf-8")))
+    except Exception:  # noqa: BLE001
+        return set()
+
+
+def _save_seen(seen: set[str]) -> None:
+    try:
+        _SEEN_FILE.write_text(json.dumps(sorted(seen)), encoding="utf-8")
+    except OSError:
+        pass
+
+
+def _query_all(token: str, database_id: str) -> list[dict]:
+    """Tüm sayfaları çek (has_more/next_cursor ile tam pagination)."""
+    pages: list[dict] = []
+    cursor = None
+    while True:
+        body: dict = {"page_size": 100}
+        if cursor:
+            body["start_cursor"] = cursor
+        res = _req(token, "POST", f"/databases/{database_id}/query", body)
+        pages.extend(res.get("results", []))
+        if not res.get("has_more"):
+            break
+        cursor = res.get("next_cursor")
+    return pages
+
+
 def run(token: str | None = None, database_id: str | None = None, poll_interval: int = 30) -> None:
     token = token or os.getenv("NOTION_TOKEN")
     database_id = database_id or os.getenv("NOTION_DATABASE_ID")
     if not token or not database_id:
         print("NOTION_TOKEN / NOTION_DATABASE_ID yok — Notion connector devre dışı.")
         return
-    seen: set[str] = set()
+    seen = _load_seen()
     print("Notion connector çalışıyor (Ctrl-C ile durdur)…")
     while True:
         try:
-            res = _req(token, "POST", f"/databases/{database_id}/query", {"page_size": 20})
+            pages = _query_all(token, database_id)
         except Exception as e:  # noqa: BLE001
             print(f"Notion query hata: {e}; {poll_interval}s bekle")
             time.sleep(poll_interval)
             continue
-        for page in res.get("results", []):
+        for page in pages:
             pid = page.get("id")
             if not pid or pid in seen:
                 continue
-            seen.add(pid)
             task = _title_of(page)
             if not task:
-                continue
+                continue                      # başlık yok → işaretleme (sonra eklenirse yakala)
             try:
                 reply = run_council(task)
-            except Exception as e:  # noqa: BLE001
-                reply = f"Hata: {e}"
-            try:
                 _req(token, "POST", "/comments", {
                     "parent": {"page_id": pid},
                     "rich_text": [{"text": {"content": reply[:1900]}}],
                 })
+                seen.add(pid)                 # yalnız BAŞARILI yorum sonrası
+                _save_seen(seen)
             except Exception as e:  # noqa: BLE001
-                print(f"Notion comment hata: {e}")
+                print(f"Notion işleme hata ({pid}): {e}")   # seen'e eklenmez → tekrar denenir
         time.sleep(poll_interval)

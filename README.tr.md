@@ -136,8 +136,8 @@ A2A üstünden yalnız ≤internal görevler otomatik çalışır; pii/phi/produ
 
 ## Connector'lar (sohbet platformları)
 
-Konseyi bir sohbet uygulamasından sürün — **Telegram** bugün çalışıyor; Slack/Notion/WhatsApp yol
-haritasında. Opt-in + kimlik-gated ve **aynı risk-gate geçerli**: phi/production her kanalda
+Konseyi bir sohbet uygulamasından sürün — **Telegram** ve **Notion** bugün çalışıyor; Slack/WhatsApp
+yol haritasında. Opt-in + kimlik-gated ve **aynı risk-gate geçerli**: phi/production her kanalda
 reddedilir. Bkz. [CONNECTORS.md](./CONNECTORS.md).
 
 ```bash

@@ -147,9 +147,9 @@ Only ≤internal tasks run automatically over A2A; pii/phi/production are reject
 
 ## Connectors (chat platforms)
 
-Drive the council from a chat app — **Telegram** works today; Slack/Notion/WhatsApp are on the
-roadmap. Opt-in + credential-gated, and the **same risk gate applies**: phi/production tasks are
-refused on every channel. See [CONNECTORS.md](./CONNECTORS.md).
+Drive the council from a chat app — **Telegram** and **Notion** work today; Slack/WhatsApp are on
+the roadmap. Opt-in + credential-gated, and the **same risk gate applies**: phi/production tasks
+are refused on every channel. See [CONNECTORS.md](./CONNECTORS.md).
 
 ```bash
 cp connectors.example.toml connectors.toml   # enable telegram + set TELEGRAM_BOT_TOKEN in .env

@@ -55,3 +55,6 @@ telemetry-backend/*.duckdb.wal
 
 # === Kullanıcıya özel connector config (lokal) ===
 connectors.toml
+
+# === Notion connector idempotent state (lokal) ===
+.konsey_notion_seen.json
