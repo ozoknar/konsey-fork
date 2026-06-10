@@ -61,8 +61,19 @@ def test_slack_disabled_without_token(monkeypatch, capsys):
 
 
 def test_whatsapp_disabled_without_creds(monkeypatch, capsys):
-    for v in ("WHATSAPP_TOKEN", "WHATSAPP_PHONE_ID", "WHATSAPP_VERIFY_TOKEN"):
+    for v in ("WHATSAPP_TOKEN", "WHATSAPP_PHONE_ID", "WHATSAPP_VERIFY_TOKEN", "WHATSAPP_APP_SECRET"):
         monkeypatch.delenv(v, raising=False)
     from connectors import whatsapp
     whatsapp.run()
     assert "devre dışı" in capsys.readouterr().out
+
+
+def test_whatsapp_extract_messages_robust():
+    """Güvenilmez/bozuk webhook JSON şekli çökertmemeli (council review [LOW])."""
+    from connectors import whatsapp
+    assert whatsapp._extract_messages("not a dict") == []
+    assert whatsapp._extract_messages({"entry": "bad-shape"}) == []
+    assert whatsapp._extract_messages({"entry": [{"changes": [{"value": {}}]}]}) == []
+    good = {"entry": [{"changes": [{"value": {"messages": [
+        {"from": "123", "text": {"body": "merhaba"}}]}}]}]}
+    assert whatsapp._extract_messages(good) == [("123", "merhaba")]

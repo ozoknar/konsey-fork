@@ -19,5 +19,6 @@ auth_env = "SLACK_BOT_TOKEN"          # ayrıca SLACK_APP_TOKEN (Socket Mode). `
 
 [connectors.whatsapp]
 enabled = false
-auth_env = "WHATSAPP_TOKEN"           # ayrıca WHATSAPP_PHONE_ID + WHATSAPP_VERIFY_TOKEN
-# Meta Cloud API webhook → public HTTPS URL'i Meta'ya kaydetmeniz gerekir.
+auth_env = "WHATSAPP_TOKEN"           # + WHATSAPP_PHONE_ID, WHATSAPP_VERIFY_TOKEN, WHATSAPP_APP_SECRET
+# Meta Cloud API webhook → public HTTPS URL'i Meta'ya kaydedin.
+# POST'lar X-Hub-Signature-256 (HMAC) ile doğrulanır → imzasız istek 403 (fail-closed).

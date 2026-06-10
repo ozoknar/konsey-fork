@@ -34,7 +34,10 @@ def run(bot_token: str | None = None, app_token: str | None = None) -> None:
         c.send_socket_mode_response(SocketModeResponse(envelope_id=req.envelope_id))
         if req.type != "events_api":
             return
-        ev = (req.payload or {}).get("event", {})
+        payload = req.payload if isinstance(req.payload, dict) else {}
+        ev = payload.get("event", {})
+        if not isinstance(ev, dict):
+            return
         if ev.get("type") not in ("app_mention", "message") or ev.get("bot_id"):
             return
         text = (ev.get("text") or "").strip()
