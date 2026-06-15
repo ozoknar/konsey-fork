@@ -164,6 +164,96 @@ if [ ! -f .env ]; then
   echo "▸ .env yazıldı (güvenlik=$LEVEL, telemetri=$TELEM)"
 fi
 
+# --- Kurulum sihirbazı: ek sağlayıcı + mesaj connector'ları (opt-in) ---------
+# /dev/tty ile sorar. tty yok / KONSEY_ASSUME_YES=1 / KONSEY_NO_WIZARD=1 → atlanır
+# (varsayılan: hiçbir entegrasyon açılmaz — güvenli). Secret'lar .env'e yazılır
+# (gitignore'lu); enable bayrakları connectors.toml / konsey.providers.toml'a.
+# NOT: prompt'u stderr'e bas — fonksiyon $(...) içinde çağrılıyor; stdout yalnız cevabı taşımalı.
+_ask()    { case "$_L" in tr) printf "%s" "$1" >&2;; *) printf "%s" "$2" >&2;; esac; local a; read -r  a < /dev/tty; printf '%s' "$a"; }
+_secret() { case "$_L" in tr) printf "%s" "$1" >&2;; *) printf "%s" "$2" >&2;; esac; local a; read -rs a < /dev/tty; echo > /dev/tty; printf '%s' "$a"; }
+_envset() { grep -q "^$1=" .env 2>/dev/null && sed -i.bak "s|^$1=.*|$1=$2|" .env || echo "$1=$2" >> .env; rm -f .env.bak; }
+
+if [ -e /dev/tty ] && [ "${KONSEY_ASSUME_YES:-0}" != "1" ] && [ "${KONSEY_NO_WIZARD:-0}" != "1" ]; then
+  case "$(_ask $'\nEk sağlayıcı/connector kuralım mı (yerel model, API key, Telegram, Notion, Slack, WhatsApp)? [e/H]: ' $'\nSet up extra providers/connectors (local model, API keys, Telegram, Notion, Slack, WhatsApp)? [y/N]: ')" in
+  [eEyY]*)
+    _need_conn=0
+
+    # 1) Yerel model (Ollama) — cihazdan veri çıkmaz
+    case "$(_ask '  • Yerel model (Ollama) ekleyeyim mi? [e/H]: ' '  • Add local model (Ollama)? [y/N]: ')" in [eEyY]*)
+      _model="$(_ask '    model adı [llama3.1]: ' '    model name [llama3.1]: ')"; [ -n "$_model" ] || _model="llama3.1"
+      [ -f konsey.providers.toml ] || cp konsey.providers.example.toml konsey.providers.toml 2>/dev/null || true
+      export _KW_OLLAMA=1 _KW_OLLAMA_MODEL="$_model"
+      command -v ollama >/dev/null 2>&1 || echo "    ⚠ 'ollama' yok — https://ollama.com kurup: ollama pull $_model"
+    ;; esac
+
+    # 2) API anahtarları (opsiyonel; CLI OAuth kullanıyorsa gerekmez) — gizli giriş
+    case "$(_ask '  • API anahtarı eklemek ister misin? [e/H]: ' '  • Add API keys? [y/N]: ')" in [eEyY]*)
+      for _kv in "ANTHROPIC_API_KEY:Anthropic" "OPENAI_API_KEY:OpenAI" "GOOGLE_API_KEY:Google"; do
+        _val="$(_secret "    ${_kv##*:} key (boş=atla): " "    ${_kv##*:} key (empty=skip): ")"
+        [ -n "$_val" ] && { _envset "${_kv%%:*}" "$_val"; echo "    ✓ ${_kv%%:*} .env'e yazıldı"; }
+      done
+    ;; esac
+
+    # 3) Telegram (bugün çalışır)
+    case "$(_ask '  • Telegram bağlayayım mı? [e/H]: ' '  • Enable Telegram? [y/N]: ')" in [eEyY]*)
+      _t="$(_secret '    BotFather token: ' '    BotFather token: ')"
+      [ -n "$_t" ] && { _envset TELEGRAM_BOT_TOKEN "$_t"; export _KW_TELEGRAM=1; _need_conn=1; echo "    ✓ Telegram ayarlandı"; }
+    ;; esac
+
+    # 4) Notion
+    case "$(_ask '  • Notion bağlayayım mı? [e/H]: ' '  • Enable Notion? [y/N]: ')" in [eEyY]*)
+      _nt="$(_secret '    Notion integration token: ' '    Notion integration token: ')"
+      _nd="$(_ask    '    Notion database id: '       '    Notion database id: ')"
+      [ -n "$_nt" ] && { _envset NOTION_TOKEN "$_nt"; _envset NOTION_DATABASE_ID "$_nd"; export _KW_NOTION=1; _need_conn=1; echo "    ✓ Notion ayarlandı"; }
+    ;; esac
+
+    # 5) Slack (slack_sdk gerekir)
+    case "$(_ask '  • Slack bağlayayım mı? [e/H]: ' '  • Enable Slack? [y/N]: ')" in [eEyY]*)
+      _sb="$(_secret '    SLACK_BOT_TOKEN: ' '    SLACK_BOT_TOKEN: ')"
+      _sa="$(_secret '    SLACK_APP_TOKEN: ' '    SLACK_APP_TOKEN: ')"
+      [ -n "$_sb" ] && { _envset SLACK_BOT_TOKEN "$_sb"; _envset SLACK_APP_TOKEN "$_sa"; export _KW_SLACK=1; _need_conn=1
+        echo "    ✓ Slack ayarlandı"; "$PY" -m pip install --quiet slack_sdk 2>/dev/null && echo "    ✓ slack_sdk kuruldu" || echo "    ⚠ 'pip install slack_sdk' gerekebilir"; }
+    ;; esac
+
+    # 6) WhatsApp (Meta + public HTTPS webhook ister)
+    case "$(_ask '  • WhatsApp bağlayayım mı? [e/H]: ' '  • Enable WhatsApp? [y/N]: ')" in [eEyY]*)
+      _wt="$(_secret '    WHATSAPP_TOKEN: '        '    WHATSAPP_TOKEN: ')"
+      _wp="$(_ask    '    WHATSAPP_PHONE_ID: '     '    WHATSAPP_PHONE_ID: ')"
+      _wv="$(_secret '    WHATSAPP_VERIFY_TOKEN: ' '    WHATSAPP_VERIFY_TOKEN: ')"
+      _ws="$(_secret '    WHATSAPP_APP_SECRET: '   '    WHATSAPP_APP_SECRET: ')"
+      [ -n "$_wt" ] && { _envset WHATSAPP_TOKEN "$_wt"; _envset WHATSAPP_PHONE_ID "$_wp"; _envset WHATSAPP_VERIFY_TOKEN "$_wv"; _envset WHATSAPP_APP_SECRET "$_ws"
+        export _KW_WHATSAPP=1; _need_conn=1; echo "    ✓ WhatsApp ayarlandı (public webhook'u Meta'ya ayrıca kaydedin)"; }
+    ;; esac
+
+    # connectors.toml hazırla (gerekirse) + enable bayraklarını güvenle ayarla (blok-içi)
+    [ "$_need_conn" = "1" ] && [ ! -f connectors.toml ] && { cp connectors.example.toml connectors.toml 2>/dev/null || true; }
+    "$PY" - <<'PYEOF'
+import os, re, pathlib
+def enable(path, block, model=None):
+    p = pathlib.Path(path)
+    if not p.exists(): return
+    out, inb, target = [], False, f"[{block}]"
+    for ln in p.read_text(encoding="utf-8").splitlines():
+        s = ln.strip()
+        if s.startswith("[") and s.endswith("]"):
+            inb = (s == target)
+        if inb and re.match(r"\s*enabled\s*=", ln):
+            ln = re.sub(r"(enabled\s*=\s*).*", r"\1true", ln)
+        if inb and model and re.match(r"\s*command\s*=", ln):
+            ln = re.sub(r'("run",\s*")[^"]*(")', lambda m: m.group(1)+model+m.group(2), ln)
+        out.append(ln)
+    p.write_text("\n".join(out) + "\n", encoding="utf-8")
+if os.environ.get("_KW_OLLAMA"):
+    enable("konsey.providers.toml", "providers.ollama", os.environ.get("_KW_OLLAMA_MODEL"))
+for env, blk in [("_KW_TELEGRAM","connectors.telegram"),("_KW_NOTION","connectors.notion"),
+                 ("_KW_SLACK","connectors.slack"),("_KW_WHATSAPP","connectors.whatsapp")]:
+    if os.environ.get(env): enable("connectors.toml", blk)
+PYEOF
+    echo "▸ entegrasyonlar yapılandırıldı. Connector'ı başlatmak için: konsey-connectors"
+  ;;
+  esac
+fi
+
 # --- Global komut: konsey-* → PATH'teki yazılabilir dizine symlink -----------
 # Amaç: kurulumdan sonra YENİ açılan terminalde (zsh/bash, source gerekmeden)
 # `konsey` çalışsın. Tercih: zaten PATH'te olan bir bin dizinine symlink; o yoksa
