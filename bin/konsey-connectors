@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 # Etkin mesaj-platformu connector'larını çalıştır (Telegram vb.).
-DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# Symlink üzerinden çağrılsa bile gerçek repo kökünü çöz.
+_self="${BASH_SOURCE[0]}"
+while [ -L "$_self" ]; do _d="$(cd -P "$(dirname "$_self")" && pwd)"; _self="$(readlink "$_self")"; case "$_self" in /*) ;; *) _self="$_d/$_self";; esac; done
+DIR="$(cd -P "$(dirname "$_self")/.." && pwd)"
 [ -x "$DIR/.venv/bin/python" ] || { echo "Konsey kurulu değil — önce ./install.sh çalıştırın." >&2; exit 1; }
 [ -f "$DIR/.env" ] && { set -a; . "$DIR/.env"; set +a; }
 exec "$DIR/.venv/bin/python" -m connectors "$@"

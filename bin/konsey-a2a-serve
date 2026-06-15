@@ -1,3 +1,6 @@
 #!/usr/bin/env bash
-DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# Symlink üzerinden çağrılsa bile gerçek repo kökünü çöz.
+_self="${BASH_SOURCE[0]}"
+while [ -L "$_self" ]; do _d="$(cd -P "$(dirname "$_self")" && pwd)"; _self="$(readlink "$_self")"; case "$_self" in /*) ;; *) _self="$_d/$_self";; esac; done
+DIR="$(cd -P "$(dirname "$_self")/.." && pwd)"
 exec "$DIR/.venv/bin/python" -m orchestrator.a2a_server "$@"
