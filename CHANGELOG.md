@@ -4,6 +4,12 @@ All notable changes to Konsey. Format loosely follows [Keep a Changelog](https:/
 
 ## [Unreleased]
 ### Added
+- **Auto-install Python 3.12+** — `install.sh` now detects a suitable interpreter (≥3.12 with
+  working `venv`/`ensurepip`) and, if none is found, installs Python 3.12 automatically *after the
+  check* via the platform package manager (macOS → Homebrew `python@3.12`; Linux →
+  apt/deadsnakes, dnf, pacman, or apk), then re-resolves. Asks for confirmation over `/dev/tty`;
+  `KONSEY_ASSUME_YES=1` skips the prompt, `KONSEY_NO_AUTOINSTALL=1` disables it. No more hard
+  exit on Python 3.9.
 - **Connectors** — messaging-platform integrations (opt-in, config-driven), all four implemented:
   **Telegram** (Bot API), **Notion** (DB polling), **Slack** (Socket Mode, needs `slack_sdk`),
   **WhatsApp** (Meta Cloud API webhook). Slack/WhatsApp are code-complete but not yet

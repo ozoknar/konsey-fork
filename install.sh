@@ -37,18 +37,89 @@ if [ ! -f "schema.sql" ] || [ ! -d "orchestrator" ]; then
   cd konsey
 fi
 
-PY="${PYTHON:-python3}"
-command -v "$PY" >/dev/null || { echo "✗ '$PY' bulunamadı. Python 3.12+ kurun veya PYTHON=... verin."; exit 1; }
-echo "▸ Python: $($PY --version)"
+# --- Python 3.12+ tespiti + (gerekirse) otomatik kurulum ---------------------
+# Önce uygun bir yorumlayıcı aranır (sürüm>=3.12 ve venv/ensurepip çalışır);
+# bulunamazsa platforma göre otomatik kurulur ve tekrar aranır.
+# KONSEY_ASSUME_YES=1 → onay sormadan kurar; KONSEY_NO_AUTOINSTALL=1 → kapatır.
+MIN_PY="3.12"
 
-# Python >= 3.12 + venv/ensurepip preflight (net hata, kriptik fail değil)
-PYVER="$("$PY" -c 'import sys;print("%d.%d"%sys.version_info[:2])' 2>/dev/null || echo 0.0)"
-case "$PYVER" in
-  3.1[2-9]|3.[2-9][0-9]|[4-9].*) : ;;
-  *) echo "✗ Python 3.12+ gerekli (bulunan: $PYVER). 'python3.12' kurup PYTHON=python3.12 ./install.sh deneyin."; exit 1;;
-esac
-"$PY" -c 'import venv, ensurepip' 2>/dev/null || {
-  echo "✗ Python 'venv'/'ensurepip' yok. Debian/Ubuntu: sudo apt install python3-venv"; exit 1; }
+# $1 yorumlayıcı sürüm>=3.12 ve venv/ensurepip gerçekten import edilebiliyorsa 0 döner.
+_py_ok() {
+  command -v "$1" >/dev/null 2>&1 || return 1
+  "$1" - <<'PY' >/dev/null 2>&1
+import sys, venv, ensurepip  # venv/ensurepip yoksa ImportError
+sys.exit(0 if sys.version_info[:2] >= (3, 12) else 1)
+PY
+}
+
+# Aday yorumlayıcılardan uygun ilkini stdout'a yazar; bulursa 0 döner.
+_find_py() {
+  local c
+  for c in "${PYTHON:-}" python3.13 python3.12 python3 python; do
+    [ -n "$c" ] || continue
+    if _py_ok "$c"; then echo "$c"; return 0; fi
+  done
+  return 1
+}
+
+# Platforma göre Python 3.12 kurmayı dener (macOS: brew, Linux: apt/dnf/pacman/apk).
+_install_py() {
+  local os; os="$(uname -s)"
+  case "$os" in
+    Darwin)
+      if command -v brew >/dev/null 2>&1; then
+        echo "▸ Homebrew ile python@3.12 kuruluyor..."
+        brew install python@3.12 || return 1
+        local pfx; pfx="$(brew --prefix python@3.12 2>/dev/null || true)"
+        [ -n "$pfx" ] && export PATH="$pfx/bin:$pfx/libexec/bin:$PATH"
+        return 0
+      fi
+      echo "✗ Homebrew bulunamadı. Önce kurun: https://brew.sh — sonra tekrar deneyin."
+      return 1 ;;
+    Linux)
+      local SUDO=""; [ "$(id -u)" -ne 0 ] && command -v sudo >/dev/null 2>&1 && SUDO="sudo"
+      if command -v apt-get >/dev/null 2>&1; then
+        echo "▸ apt ile Python 3.12 kuruluyor..."
+        $SUDO apt-get update -qq || true
+        if ! apt-cache show python3.12 >/dev/null 2>&1; then  # eski sürümlerde deadsnakes gerekir
+          $SUDO apt-get install -y -qq software-properties-common || true
+          $SUDO add-apt-repository -y ppa:deadsnakes/ppa || true
+          $SUDO apt-get update -qq || true
+        fi
+        $SUDO apt-get install -y -qq python3.12 python3.12-venv || return 1; return 0
+      elif command -v dnf >/dev/null 2>&1; then
+        echo "▸ dnf ile Python 3.12 kuruluyor..."; $SUDO dnf install -y python3.12 || return 1; return 0
+      elif command -v pacman >/dev/null 2>&1; then
+        echo "▸ pacman ile Python kuruluyor..."; $SUDO pacman -Sy --noconfirm python || return 1; return 0
+      elif command -v apk >/dev/null 2>&1; then
+        echo "▸ apk ile Python kuruluyor..."; $SUDO apk add --no-cache python3 || return 1; return 0
+      fi
+      echo "✗ Desteklenen paket yöneticisi yok (apt/dnf/pacman/apk). Python ${MIN_PY}+ elle kurun."
+      return 1 ;;
+    *)
+      echo "✗ Otomatik kurulum bu platformda ($os) desteklenmiyor. Python ${MIN_PY}+ elle kurun."
+      return 1 ;;
+  esac
+}
+
+PY="$(_find_py || true)"
+if [ -z "$PY" ]; then
+  echo "✗ Python ${MIN_PY}+ bulunamadı (venv/ensurepip dahil)."
+  if [ "${KONSEY_NO_AUTOINSTALL:-0}" = "1" ]; then
+    echo "  Otomatik kurulum kapalı (KONSEY_NO_AUTOINSTALL=1). Python ${MIN_PY}+ kurup tekrar deneyin."; exit 1
+  fi
+  # curl|bash'te stdin script'tir → onayı /dev/tty üzerinden sor.
+  if [ -e /dev/tty ] && [ "${KONSEY_ASSUME_YES:-0}" != "1" ]; then
+    printf "Python %s otomatik kurulsun mu? [E/h]: " "$MIN_PY"; read -r _ans < /dev/tty
+    case "$_ans" in [hHnN]*) echo "✗ İptal. Python ${MIN_PY}+ kurup tekrar deneyin."; exit 1;; esac
+  fi
+  echo "▸ Python ${MIN_PY} otomatik kurulumu deneniyor..."
+  _install_py || { echo "✗ Otomatik kurulum başarısız. Python ${MIN_PY}+ elle kurun."; exit 1; }
+  hash -r 2>/dev/null || true
+  PY="$(_find_py || true)"
+  [ -n "$PY" ] || { echo "✗ Kurulum sonrası da uygun Python bulunamadı. PATH'i kontrol edin."; exit 1; }
+fi
+echo "▸ Python: $("$PY" --version) ($PY)"
 
 echo "▸ venv (.venv) + bağımlılıklar..."
 "$PY" -m venv .venv
