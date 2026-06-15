@@ -164,8 +164,10 @@ if [ ! -f .env ]; then
   echo "▸ .env yazıldı (güvenlik=$LEVEL, telemetri=$TELEM)"
 fi
 
-# --- PATH: konsey komutlarını global yap (opt-in, idempotent) ---
-# Atla: KONSEY_NO_PATH=1. CI/non-interaktif: yalnız KONSEY_ADD_PATH=1 ile ekler.
+# --- Global komut: konsey-* → PATH'teki yazılabilir dizine symlink -----------
+# Amaç: kurulumdan sonra YENİ açılan terminalde (zsh/bash, source gerekmeden)
+# `konsey` çalışsın. Tercih: zaten PATH'te olan bir bin dizinine symlink; o yoksa
+# shell rc'sine PATH ekle (fallback). Atla: KONSEY_NO_PATH=1.
 KONSEY_BIN="$(pwd)/bin"
 _add_path=0
 if [ "${KONSEY_NO_PATH:-0}" != "1" ]; then
@@ -173,29 +175,57 @@ if [ "${KONSEY_NO_PATH:-0}" != "1" ]; then
     [ "${KONSEY_ADD_PATH:-0}" = "1" ] && _add_path=1
   elif [ -e /dev/tty ]; then
     case "$_L" in
-      tr) printf "konsey komutlarını PATH'e ekleyeyim mi (her yerden çalışsın)? [E/h]: ";;
-      *)  printf "Add konsey commands to PATH (run from anywhere)? [Y/n]: ";;
+      tr) printf "konsey komutları her yerden çalışsın mı? [E/h]: ";;
+      *)  printf "Make konsey commands available everywhere? [Y/n]: ";;
     esac
     read -r _p < /dev/tty; case "$_p" in [hHnN]*) _add_path=0;; *) _add_path=1;; esac
   fi
 fi
+
+_linked=0; _hint_rc=""
 if [ "$_add_path" = "1" ]; then
-  case "${SHELL##*/}" in
-    zsh)  _rc="$HOME/.zshrc" ;;
-    bash) [ -f "$HOME/.bash_profile" ] && _rc="$HOME/.bash_profile" || _rc="$HOME/.bashrc" ;;
-    *)    _rc="$HOME/.profile" ;;
-  esac
-  if grep -qs "konsey/bin" "$_rc" 2>/dev/null; then
-    echo "▸ PATH zaten ekli ($_rc)."
-  else
-    printf '\n# Konsey CLI\nexport PATH="%s:$PATH"\n' "$KONSEY_BIN" >> "$_rc"
-    echo "▸ PATH güncellendi ($_rc) → yeni terminal aç ya da: source $_rc"
+  # 1) PATH'te yazılabilir standart bir bin dizini bul ve symlink'le.
+  _dir=""
+  for d in "${HOMEBREW_PREFIX:-/opt/homebrew}/bin" /usr/local/bin "$HOME/.local/bin"; do
+    [ -d "$d" ] && [ -w "$d" ] && { _dir="$d"; break; }
+  done
+  if [ -n "$_dir" ]; then
+    for f in "$KONSEY_BIN"/*; do
+      case "$(basename "$f")" in *.*) continue;; esac   # .sh/.py yardımcıları atla
+      [ -x "$f" ] || continue
+      ln -sf "$f" "$_dir/$(basename "$f")" && _linked=$((_linked+1))
+    done
+    [ "$_linked" -gt 0 ] && echo "▸ $_linked komut bağlandı → $_dir"
+  fi
+  # 2) Symlink olmadıysa (yazılabilir PATH dizini yok): shell rc'ye PATH ekle.
+  if [ "$_linked" -eq 0 ]; then
+    case "${SHELL##*/}" in
+      zsh)  _rc="$HOME/.zshrc" ;;
+      bash) [ -f "$HOME/.bash_profile" ] && _rc="$HOME/.bash_profile" || _rc="$HOME/.bashrc" ;;
+      *)    _rc="$HOME/.profile" ;;
+    esac
+    grep -qs "konsey/bin" "$_rc" 2>/dev/null || \
+      printf '\n# Konsey CLI\nexport PATH="%s:$PATH"\n' "$KONSEY_BIN" >> "$_rc"
+    _hint_rc="$_rc"
+    echo "▸ PATH eklendi ($_rc)."
   fi
 fi
 
 echo
 msg done
 if [ "$_add_path" = "1" ]; then
+  # NOT: hâlihazırda açık olan kabuk değişikliği göremez (Unix). Yeni terminal aç.
+  if [ -n "$_hint_rc" ]; then
+    case "$_L" in
+      tr) echo "  ⚠ Yeni terminal aç (ya da: source $_hint_rc), sonra:";;
+      *)  echo "  ⚠ Open a new terminal (or: source $_hint_rc), then:";;
+    esac
+  else
+    case "$_L" in
+      tr) echo "  ⚠ Yeni terminal aç (ya da bu terminalde: hash -r), sonra:";;
+      *)  echo "  ⚠ Open a new terminal (or run 'hash -r' here), then:";;
+    esac
+  fi
   echo "    konsey-run \"my first task\""
   echo "    konsey recent"
 else
