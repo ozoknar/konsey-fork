@@ -69,7 +69,8 @@ _install_py() {
     Darwin)
       if command -v brew >/dev/null 2>&1; then
         echo "▸ Homebrew ile python@3.12 kuruluyor..."
-        brew install python@3.12 || return 1
+        # curl|bash'te stdin script gövdesidir; brew onu tüketmesin diye </dev/null.
+        brew install python@3.12 </dev/null || return 1
         local pfx; pfx="$(brew --prefix python@3.12 2>/dev/null || true)"
         [ -n "$pfx" ] && export PATH="$pfx/bin:$pfx/libexec/bin:$PATH"
         return 0
@@ -86,13 +87,13 @@ _install_py() {
           $SUDO add-apt-repository -y ppa:deadsnakes/ppa || true
           $SUDO apt-get update -qq || true
         fi
-        $SUDO apt-get install -y -qq python3.12 python3.12-venv || return 1; return 0
+        $SUDO apt-get install -y -qq python3.12 python3.12-venv </dev/null || return 1; return 0
       elif command -v dnf >/dev/null 2>&1; then
-        echo "▸ dnf ile Python 3.12 kuruluyor..."; $SUDO dnf install -y python3.12 || return 1; return 0
+        echo "▸ dnf ile Python 3.12 kuruluyor..."; $SUDO dnf install -y python3.12 </dev/null || return 1; return 0
       elif command -v pacman >/dev/null 2>&1; then
-        echo "▸ pacman ile Python kuruluyor..."; $SUDO pacman -Sy --noconfirm python || return 1; return 0
+        echo "▸ pacman ile Python kuruluyor..."; $SUDO pacman -Sy --noconfirm python </dev/null || return 1; return 0
       elif command -v apk >/dev/null 2>&1; then
-        echo "▸ apk ile Python kuruluyor..."; $SUDO apk add --no-cache python3 || return 1; return 0
+        echo "▸ apk ile Python kuruluyor..."; $SUDO apk add --no-cache python3 </dev/null || return 1; return 0
       fi
       echo "✗ Desteklenen paket yöneticisi yok (apt/dnf/pacman/apk). Python ${MIN_PY}+ elle kurun."
       return 1 ;;
