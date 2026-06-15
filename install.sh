@@ -164,7 +164,41 @@ if [ ! -f .env ]; then
   echo "▸ .env yazıldı (güvenlik=$LEVEL, telemetri=$TELEM)"
 fi
 
+# --- PATH: konsey komutlarını global yap (opt-in, idempotent) ---
+# Atla: KONSEY_NO_PATH=1. CI/non-interaktif: yalnız KONSEY_ADD_PATH=1 ile ekler.
+KONSEY_BIN="$(pwd)/bin"
+_add_path=0
+if [ "${KONSEY_NO_PATH:-0}" != "1" ]; then
+  if [ "${KONSEY_ASSUME_YES:-0}" = "1" ]; then
+    [ "${KONSEY_ADD_PATH:-0}" = "1" ] && _add_path=1
+  elif [ -e /dev/tty ]; then
+    case "$_L" in
+      tr) printf "konsey komutlarını PATH'e ekleyeyim mi (her yerden çalışsın)? [E/h]: ";;
+      *)  printf "Add konsey commands to PATH (run from anywhere)? [Y/n]: ";;
+    esac
+    read -r _p < /dev/tty; case "$_p" in [hHnN]*) _add_path=0;; *) _add_path=1;; esac
+  fi
+fi
+if [ "$_add_path" = "1" ]; then
+  case "${SHELL##*/}" in
+    zsh)  _rc="$HOME/.zshrc" ;;
+    bash) [ -f "$HOME/.bash_profile" ] && _rc="$HOME/.bash_profile" || _rc="$HOME/.bashrc" ;;
+    *)    _rc="$HOME/.profile" ;;
+  esac
+  if grep -qs "konsey/bin" "$_rc" 2>/dev/null; then
+    echo "▸ PATH zaten ekli ($_rc)."
+  else
+    printf '\n# Konsey CLI\nexport PATH="%s:$PATH"\n' "$KONSEY_BIN" >> "$_rc"
+    echo "▸ PATH güncellendi ($_rc) → yeni terminal aç ya da: source $_rc"
+  fi
+fi
+
 echo
 msg done
-echo "    ./bin/konsey-run \"my first task\""
-echo "    ./bin/konsey recent"
+if [ "$_add_path" = "1" ]; then
+  echo "    konsey-run \"my first task\""
+  echo "    konsey recent"
+else
+  echo "    ./bin/konsey-run \"my first task\""
+  echo "    ./bin/konsey recent"
+fi
