@@ -38,13 +38,19 @@ from .config import Config, available as _config_available
 available = _config_available
 
 
-def _env(cfg: Config) -> dict[str, str]:
+def _env(cfg: Config, agent_name: str | None = None, temp_home: str | None = None) -> dict[str, str]:
     """Build the child-process environment at call time (NOT an import-time snapshot).
 
     The live ``os.environ`` is inherited so guard/flag env vars reach the subprocess,
     and PATH is prepended with ``cfg.extra_path`` so a Homebrew/`~/.local/bin` CLI is
     found rather than silently reported missing (critique §2)."""
-    return {**os.environ, "PATH": os.pathsep.join([cfg.extra_path, os.environ.get("PATH", "")])}
+    env = {**os.environ, "PATH": os.pathsep.join([cfg.extra_path, os.environ.get("PATH", "")])}
+    if not cfg.unsafe_inherit_provider_config and temp_home:
+        if agent_name == "google":
+            env["HOME"] = temp_home
+        elif agent_name == "codex":
+            env["CODEX_HOME"] = temp_home
+    return env
 
 
 @dataclass
@@ -116,8 +122,15 @@ BUILTIN_PROFILES: dict[str, CLIProfile] = {
         default_timeout=180,
     ),
     # Codex: exec subcommand; skip git-repo check so it runs anywhere.
+    # approval_policy=never + sandbox_mode=read-only make the call truly headless:
+    # without them codex blocks on an interactive approval prompt that never arrives
+    # in a piped subprocess, hanging until the hard timeout (proven failure mode).
+    # read-only is correct for reasoning nodes (PLAN/CRITIQUE/VERIFY produce text only;
+    # real file/command execution is the separate opt-in execute path).
     "codex": CLIProfile(
-        argv_template=("{cli}", "exec", "--skip-git-repo-check", "{prompt}"),
+        argv_template=("{cli}", "exec", "--skip-git-repo-check",
+                       "-c", "approval_policy=never", "-c", "sandbox_mode=read-only",
+                       "{prompt}"),
         default_timeout=240,
     ),
     # Gemini / Antigravity (agy): self-imposed print deadline a bit under the hard kill.
@@ -150,18 +163,49 @@ class GenericCLIAdapter(AgentAdapter):
         self.cfg = cfg
         self.profile = profile or BUILTIN_PROFILES.get(name, _DEFAULT_PROFILE)
 
-    def _argv(self, prompt: str, timeout: int) -> list[str]:
+    def _argv(self, prompt: str, timeout: int, temp_home: str | None = None) -> list[str]:
         prof = self.profile
         text = (prof.prompt_prefix + prompt) if prof.prompt_prefix else prompt
         deadline = max(1, timeout - prof.timeout_slack)
         argv: list[str] = []
         for tok in prof.argv_template:
             argv.append(tok.format(cli=self.cli, prompt=text, timeout=timeout, deadline=deadline))
+
+        # Enforce node isolation (PR2) if not opted out
+        if not self.cfg.unsafe_inherit_provider_config:
+            if self.name == "claude":
+                if len(argv) > 1 and argv[0] == self.cli:
+                    argv = [argv[0], "--strict-mcp-config", "--setting-sources", "none"] + argv[1:]
+            elif self.name == "codex":
+                if len(argv) > 1 and argv[0] == self.cli:
+                    try:
+                        exec_idx = argv.index("exec")
+                        prefix_args = ["-c", "project_doc_max_bytes=0"]
+                        if temp_home:
+                            prefix_args += ["-C", temp_home]
+                        argv = argv[:exec_idx] + prefix_args + ["exec", "--ignore-user-config"] + argv[exec_idx+1:]
+                    except ValueError:
+                        prefix_args = ["-c", "project_doc_max_bytes=0"]
+                        if temp_home:
+                            prefix_args += ["-C", temp_home]
+                        argv = [argv[0]] + prefix_args + ["--ignore-user-config"] + argv[1:]
         return argv
 
     def run(self, prompt: str, timeout: int | None = None) -> AgentResult:
         t = timeout if timeout is not None else self.profile.default_timeout
-        return _run(self.name, self._argv(prompt, t), t, _env(self.cfg))
+        temp_home = None
+        if not self.cfg.unsafe_inherit_provider_config:
+            import tempfile
+            temp_home = tempfile.mkdtemp(prefix=f"council-isolated-{self.name}-")
+
+        try:
+            env = _env(self.cfg, self.name, temp_home)
+            argv = self._argv(prompt, t, temp_home)
+            return _run(self.name, argv, t, env)
+        finally:
+            if temp_home:
+                import shutil
+                shutil.rmtree(temp_home, ignore_errors=True)
 
 
 def build_registry(cfg: Config) -> dict[str, GenericCLIAdapter]:

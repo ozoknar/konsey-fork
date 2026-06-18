@@ -102,10 +102,15 @@ def scan_host_ai_config(home: Path, cwd: Path) -> list[HostConfigFinding]:
     # Global, HOME-level config.
     for label, rel, pollutes, kind in _HOME_SIGNATURES:
         _add(label, home / rel, pollutes, kind)
-    # Project-level config: cwd + every ancestor (CLIs walk upward).
+    # Project-level config: cwd + every ancestor (CLIs walk upward) up to git repo root or home.
     for directory in (cwd, *cwd.parents):
         for label, rel, pollutes, kind in _CWD_SIGNATURES:
             _add(label, directory / rel, pollutes, kind)
+        try:
+            if (directory / ".git").is_dir() or directory == home:
+                break
+        except Exception:
+            pass
     return findings
 
 

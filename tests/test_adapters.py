@@ -104,3 +104,62 @@ def test_no_sdk_or_http_dependency_in_adapter_module():
     for forbidden in ("import requests", "import httpx", "from openai", "import openai",
                       "from anthropic", "import anthropic"):
         assert forbidden not in src, f"adapter must not depend on an SDK/HTTP client: {forbidden!r}"
+
+
+def test_node_isolation_argv_modification():
+    cfg_isolated = Config(unsafe_inherit_provider_config=False)
+    cfg_unsafe = Config(unsafe_inherit_provider_config=True)
+
+    # 1. Claude isolated argv
+    ad_claude = GenericCLIAdapter(name="claude", cli="claude", cfg=cfg_isolated)
+    argv = ad_claude._argv("test prompt", 180)
+    assert "--strict-mcp-config" in argv
+    assert "--setting-sources" in argv
+    assert "none" in argv
+
+    # 2. Claude unsafe/inherited argv
+    ad_claude_unsafe = GenericCLIAdapter(name="claude", cli="claude", cfg=cfg_unsafe)
+    argv_unsafe = ad_claude_unsafe._argv("test prompt", 180)
+    assert "--strict-mcp-config" not in argv_unsafe
+    assert "--setting-sources" not in argv_unsafe
+
+    # 3. Codex isolated argv
+    ad_codex = GenericCLIAdapter(name="codex", cli="codex", cfg=cfg_isolated)
+    argv_codex = ad_codex._argv("test prompt", 180, temp_home="/tmp/fake")
+    assert "-c" in argv_codex
+    assert "project_doc_max_bytes=0" in argv_codex
+    assert "--ignore-user-config" in argv_codex
+    assert "-C" in argv_codex
+    assert "/tmp/fake" in argv_codex
+
+    # 4. Codex unsafe argv — inherits user config, so the ISOLATION overrides are
+    # absent; but the headless approval/sandbox flags are ALWAYS present (they are
+    # what stops codex hanging on an interactive approval prompt in a piped call).
+    ad_codex_unsafe = GenericCLIAdapter(name="codex", cli="codex", cfg=cfg_unsafe)
+    argv_codex_unsafe = ad_codex_unsafe._argv("test prompt", 180, temp_home="/tmp/fake")
+    assert "project_doc_max_bytes=0" not in argv_codex_unsafe
+    assert "--ignore-user-config" not in argv_codex_unsafe
+    assert "approval_policy=never" in argv_codex_unsafe
+    assert "sandbox_mode=read-only" in argv_codex_unsafe
+
+
+def test_node_isolation_env_modification():
+    cfg_isolated = Config(unsafe_inherit_provider_config=False)
+    cfg_unsafe = Config(unsafe_inherit_provider_config=True)
+
+    from council.adapters import _env
+
+    # 1. Google/agy environment mapping
+    env_google = _env(cfg_isolated, "google", "/tmp/fake_google")
+    assert env_google.get("HOME") == "/tmp/fake_google"
+
+    env_google_unsafe = _env(cfg_unsafe, "google", "/tmp/fake_google")
+    assert env_google_unsafe.get("HOME") != "/tmp/fake_google"
+
+    # 2. Codex environment mapping
+    env_codex = _env(cfg_isolated, "codex", "/tmp/fake_codex")
+    assert env_codex.get("CODEX_HOME") == "/tmp/fake_codex"
+
+    env_codex_unsafe = _env(cfg_unsafe, "codex", "/tmp/fake_codex")
+    assert env_codex_unsafe.get("CODEX_HOME") != "/tmp/fake_codex"
+

@@ -247,3 +247,27 @@ def test_cmd_init_degrades_safely_when_scan_raises(tmp_path, monkeypatch, capsys
     # Evidence standard (Art 2.1): a failed scan must NOT be reported as clean.
     assert "could NOT prove the host is clean" in out
     assert "no host AI-config detected" not in out
+
+
+def test_does_not_walk_above_git_repo_root(tmp_path):
+    home = tmp_path / "home"
+    home.mkdir()
+    project = tmp_path / "proj"
+    repo_root = project / "repo"
+    deep = repo_root / "src" / "pkg"
+    deep.mkdir(parents=True)
+
+    # Put a .git folder in repo_root to establish a boundary
+    (repo_root / ".git").mkdir()
+
+    # Put a project config in repo_root (should be detected)
+    _touch(repo_root / "AGENTS.md")
+
+    # Put a project config outside the repo root, in project/ (should NOT be detected)
+    _touch(project / "GEMINI.md")
+
+    found = scan_host_ai_config(home, deep)
+    labels = {f.label for f in found}
+    assert "project Codex instructions" in labels
+    assert "project Gemini memory" not in labels
+
