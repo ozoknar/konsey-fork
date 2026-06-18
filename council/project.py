@@ -88,7 +88,7 @@ def run_project(
 
         # 1. Claim (CAS): if another writer advanced the board, re-read and retry.
         try:
-            claimed = ledger.claim(task.id, worker_agent, expected_version=snap.version)
+            ledger.claim(task.id, worker_agent, expected_version=snap.version)
         except (StaleLedgerError, TaskStateError):
             continue
 
