@@ -145,6 +145,7 @@ def test_load_config_parses_real_toml(tmp_path):
         locale = "tr"
         data_regime = "kvkk"
         autocapture_enabled = false
+        unsafe_inherit_provider_config = true
 
         [[agents]]
         name = "claude"
@@ -168,6 +169,7 @@ def test_load_config_parses_real_toml(tmp_path):
     assert c.node_name == "acme-dev-01"
     assert c.locale == "tr"
     assert c.data_regime == "kvkk"
+    assert c.unsafe_inherit_provider_config is True
     assert c.by_role("lead") == ["claude"]
     assert c.by_role("verifier") == []           # disabled → not surfaced
     assert c.projects == [ProjectEntry(match="infra/*", risk="production")]

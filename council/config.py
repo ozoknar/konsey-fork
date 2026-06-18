@@ -103,6 +103,7 @@ class Config:
     notifier: str = "null"                  # osascript|notify-send|win-toast|null
     exec_sandbox: str = "off"               # off|read-only|workspace-write (Md.6.2)
     autocapture_enabled: bool = False       # opt-in; default OFF (Md.0.7)
+    unsafe_inherit_provider_config: bool = False # opt-in: do not isolate node subprocess environment (PR2)
     extra_path: str = field(default_factory=_default_extra_path)
     budgets: dict[str, dict[str, Any]] = field(default_factory=dict)
     # thresholds (per-instance, default to module constants)
@@ -237,6 +238,7 @@ def load_config(path: str | os.PathLike[str] | None = None) -> Config:
         notifier=str(data.get("notifier", base.notifier)) or base.notifier,
         exec_sandbox=str(data.get("exec_sandbox", base.exec_sandbox)) or base.exec_sandbox,
         autocapture_enabled=bool(data.get("autocapture_enabled", base.autocapture_enabled)),
+        unsafe_inherit_provider_config=bool(data.get("unsafe_inherit_provider_config", base.unsafe_inherit_provider_config)),
         extra_path=str(data.get("extra_path", base.extra_path)) or base.extra_path,
         budgets=dict(data.get("budgets", base.budgets)),
         max_verify_retries=int(data.get("max_verify_retries", base.max_verify_retries)),

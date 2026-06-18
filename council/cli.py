@@ -716,6 +716,8 @@ def cmd_do(args: argparse.Namespace) -> int:
     the verified branch is kept for review/PR ONLY on human approval. Default OFF (three
     independent locks: exec_sandbox + opt-in key + TTY confirm). NEVER merges to master."""
     cfg = load_config()
+    if getattr(args, "unsafe_inherit_provider_config", False):
+        cfg = replace(cfg, unsafe_inherit_provider_config=True)
     cat = load_catalog(cfg)
     task = args.task
 
@@ -790,6 +792,8 @@ def cmd_do(args: argparse.Namespace) -> int:
 
 def cmd_run(args: argparse.Namespace) -> int:
     cfg = load_config()
+    if getattr(args, "unsafe_inherit_provider_config", False):
+        cfg = replace(cfg, unsafe_inherit_provider_config=True)
     cat = load_catalog(cfg)
     try:
         from .graph import build
@@ -1445,6 +1449,8 @@ def build_parser() -> argparse.ArgumentParser:
     sp.add_argument("--provider", default=None, help="force a worker provider (claude|codex); default = auto")
     sp.add_argument("--force", action="store_true", help="opt in to RUNNING the worker non-interactively (skips the opt-in key + confirm + dirty-git guard); does NOT keep the result")
     sp.add_argument("--keep", action="store_true", help="non-interactively KEEP a verified result on its branch (else you're asked / it is discarded)")
+    sp.add_argument("--unsafe-inherit-provider-config", action="store_true",
+                    help="opt-in: do not isolate node subprocess environment (inherit global host AI configs)")
     sp.set_defaults(func=cmd_do)
 
     sp = sub.add_parser("run", help="headless 9-state loop")
@@ -1452,6 +1458,8 @@ def build_parser() -> argparse.ArgumentParser:
     sp.add_argument("--project", default="", help="project name/hint (risk classification)")
     sp.add_argument("--dry-run", action="store_true", help="PREFLIGHT only (classify + secret scan)")
     sp.add_argument("--json", action="store_true", help="machine-readable output")
+    sp.add_argument("--unsafe-inherit-provider-config", action="store_true",
+                    help="opt-in: do not isolate node subprocess environment (inherit global host AI configs)")
     sp.set_defaults(func=cmd_run)
 
     sp = sub.add_parser("status", help="roster health + last sessions + DB size")
