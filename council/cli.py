@@ -850,6 +850,68 @@ def cmd_run(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_project(args: argparse.Namespace) -> int:
+    """Project mode (Faz 3b): drive a whole task board to completion.
+
+    Each task runs a claim -> produce -> cross-verify -> complete cycle: a worker
+    provider produces the work, a *different* verifier provider certifies it
+    (producer != verifier), and only then does the orchestrator mark it done on the
+    single-writer ledger. Durable spec/plan/tasks.md are written alongside. The true
+    live run needs >= 2 providers on PATH; with one it cannot cross-verify and refuses
+    rather than self-certifying."""
+    cfg = load_config()
+    if getattr(args, "unsafe_inherit_provider_config", False):
+        cfg = replace(cfg, unsafe_inherit_provider_config=True)
+
+    titles = [s.strip() for s in (args.tasks or "").split(";") if s.strip()]
+    if not titles:
+        _err("project mode needs a task list, e.g. --tasks 'design schema;write loader;add tests'")
+        return 2
+
+    # Roster: worker = first available lead (fallback: any enabled+available agent);
+    # verifier = a different available provider so producer != verifier holds.
+    avail = available(cfg)
+    leads = [n for n in cfg.by_role(ROLE_LEAD) if avail.get(n)] or \
+            [a.name for a in cfg.agents if a.enabled and avail.get(a.name)]
+    worker = leads[0] if leads else None
+    verifier = cfg.verifier(exclude=worker) if worker else None
+    if not worker or not verifier or not avail.get(verifier):
+        _err("project mode needs >= 2 available providers (producer != verifier); run `konsey doctor`")
+        return 2
+
+    from .artifacts import ArtifactStore, TaskLedger
+    from .project import adapter_verify_fn, adapter_work_fn, run_project
+
+    name = args.name or "project"
+    proj_dir = Path(args.dir) if args.dir else (cfg.data_home / "projects" / name)
+    store = ArtifactStore(proj_dir)
+    ledger = TaskLedger(proj_dir)
+    store.write("spec.md", f"# {name}\n\nGoal: {args.task or name}\n")
+    store.write("plan.md", "# Plan\n\n" + "\n".join(f"- {x}" for x in titles) + "\n")
+
+    _emit(f"project '{name}': worker={worker}  verifier={verifier}  tasks={len(titles)}")
+    res = run_project(
+        ledger, titles,
+        work_fn=adapter_work_fn(cfg, worker),
+        verify_fn=adapter_verify_fn(cfg, verifier),
+        worker_agent=worker, verifier_agent=verifier,
+        max_attempts=args.max_attempts,
+    )
+
+    final = ledger.snapshot()
+    rows = []
+    for tk in final.tasks:
+        box = "x" if tk.status == "done" else " "
+        ev = tk.evidence[-1] if tk.evidence else None
+        trail = f"  <!-- {ev['produced_by']}->{ev['verified_by']} {ev['hash']} -->" if ev else ""
+        rows.append(f"- [{box}] {tk.id} {tk.title}{trail}")
+    store.write("tasks.md", "# Tasks\n\n" + "\n".join(rows) + "\n")
+
+    _emit(f"{_OK} done={res.done}   abandoned={res.abandoned}")
+    _emit(f"artifacts written under: {proj_dir}")
+    return 0 if not res.abandoned else 1
+
+
 def _accepts_cfg(fn) -> bool:
     try:
         import inspect
@@ -1461,6 +1523,16 @@ def build_parser() -> argparse.ArgumentParser:
     sp.add_argument("--unsafe-inherit-provider-config", action="store_true",
                     help="opt-in: do not isolate node subprocess environment (inherit global host AI configs)")
     sp.set_defaults(func=cmd_run)
+
+    sp = sub.add_parser("project", help="multi-task project mode: per-task cross-verified loop (Faz 3b)")
+    sp.add_argument("task", nargs="?", default="", help="high-level goal (recorded in spec.md)")
+    sp.add_argument("--tasks", required=True, help="';'-separated task list, e.g. 'design;build;test'")
+    sp.add_argument("--name", default="project", help="project name (artifact subdir under data_home)")
+    sp.add_argument("--dir", default="", help="artifact/ledger directory (default: <data_home>/projects/<name>)")
+    sp.add_argument("--max-attempts", type=int, default=2, help="per-task verify attempts before a task is abandoned")
+    sp.add_argument("--unsafe-inherit-provider-config", action="store_true",
+                    help="opt-in: do not isolate node subprocess environment (inherit host AI configs incl. auth)")
+    sp.set_defaults(func=cmd_project)
 
     sp = sub.add_parser("status", help="roster health + last sessions + DB size")
     sp.set_defaults(func=cmd_status)
