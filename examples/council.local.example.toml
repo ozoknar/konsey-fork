@@ -1,0 +1,37 @@
+# Council — example local profile (FICTIONAL "Acme Labs"; NOT derived from any real
+# deployment). Copy to `council.local.toml` and edit for your machine.
+#
+# This file holds ONLY declarative facts — NEVER secrets. API keys / tokens live in your
+# OS keychain or secret manager, never in this file or the repo (Constitution Art. 2.4).
+# `council.local.toml` is git-ignored; this `*.example.toml` is the tracked template.
+
+owner  = "operator"          # a label, NOT your machine username — never leaked to the audit log
+org    = "Acme Labs"
+locale = "en"                # en | tr
+data_regime  = "standard"    # standard | kvkk | gdpr | hipaa  (regulated → regimes/<name>.toml)
+exec_sandbox = "off"         # off | read-only | workspace-write
+autocapture_enabled = false  # opt-in background distillation; default OFF
+parallel_plan = false        # opt-in: run the PLAN providers concurrently; default OFF
+verify_cmd = ""              # opt-in: a real acceptance command at VERIFY (e.g. "pytest -q");
+                             #   its exit code is authoritative over the LLM verdict
+                             #   (gate-test != real-test). Empty = LLM-only verify.
+
+# Roster: a generic role → a provider CLI on PATH. Cross-verification needs >= 2 providers
+# so the producer of a result is never its sole verifier (Art. 2.4); a single provider runs
+# in advisory mode (capped confidence). Swap a provider by changing `cli` — never the code.
+[[agents]]
+name = "claude"
+cli  = "claude"
+role = "lead"
+
+[[agents]]
+name = "codex"
+cli  = "codex"
+role = "critic"              # a different provider than the lead → it can cross-verify
+
+# Project risk registry: a project name alone never implies sensitivity — risk is what YOU
+# declare here (Art. 4.4). The glob matches the `--project` hint; the highest match wins and
+# can only RAISE the floor, never lower it.
+[[projects]]
+match = "infra/*"
+risk  = "production"         # public | internal | pii | sensitive | production

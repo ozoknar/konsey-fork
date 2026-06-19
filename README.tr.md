@@ -148,11 +148,19 @@ locale = "en"               # en | tr
 data_regime = "standard"    # standard | kvkk | gdpr | hipaa
 exec_sandbox = "off"        # off | read-only | workspace-write
 autocapture_enabled = false # opt-in; varsayılan KAPALI
+parallel_plan = false       # opt-in: PLAN sağlayıcıları eşzamanlı koş (varsayılan KAPALI)
+verify_cmd = ""             # opt-in: VERIFY'de gerçek kabul komutu; exit-code'u LLM
+                            #   kararından üstündür (gate-test ≠ real-test)
 
 [[agents]]                  # jenerik rol → sağlayıcı; üreten asla tek doğrulayıcı değil
 name = "claude"
 cli  = "claude"
 role = "lead"
+
+[[agents]]                  # lead'in işini çapraz-doğrulayacak 2. sağlayıcı
+name = "codex"
+cli  = "codex"
+role = "critic"
 
 [[projects]]                # proje adı tek başına asla phi anlamına gelmez
 match = "infra/*"

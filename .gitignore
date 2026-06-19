@@ -39,6 +39,8 @@
 
 # 4) NEVER commit these machine-specific leaks, even if a rule above re-allowed them.
 council.local.*
+# ...but the tracked, secret-free example template IS committed (no inline comments in gitignore)
+!council.local.example.toml
 COUNCIL.md
 COUNCIL.local.md
 KONSEY_ANAYASASI.md

@@ -88,6 +88,31 @@ def test_readmes_link_existing_docs_not_phase2_placeholders() -> None:
         assert "SECURITY.md` (Faz 2)" not in body
 
 
+def test_readme_example_config_exists_and_loads() -> None:
+    """README §7 links to examples/council.local.example.toml as the starting template —
+    so the file must exist (a dangling link is a doc bug), actually PARSE via the real
+    loader, and demonstrate cross-verification (>= 2 providers, producer != verifier)."""
+    from council.config import load_config
+
+    example = REPO / "examples" / "council.local.example.toml"
+    assert example.exists(), "README references examples/council.local.example.toml but it is missing"
+    # both READMEs that mention it must keep the link resolvable
+    for path in (README, README_TR):
+        body = path.read_text(encoding="utf-8")
+        if "council.local.example.toml" in body:
+            assert "examples/council.local.example.toml" in body
+
+    cfg = load_config(example)                       # must parse, not raise
+    assert cfg.org == "Acme Labs"                    # the documented fictional profile
+    assert len(cfg.agents) >= 2                       # cross-verification needs >= 2 providers
+    lead = cfg.agents[0].name
+    assert cfg.verifier(exclude=lead) is not None     # producer != verifier is satisfiable
+    # the file holds declarative facts only — no secret-shaped values
+    raw = example.read_text(encoding="utf-8")
+    import re as _re
+    assert not _re.search(r"\bsk-[A-Za-z0-9]{16,}", raw), "example config must not contain a secret"
+
+
 def test_changelog_is_portable_and_keepachangelog() -> None:
     """CHANGELOG follows Keep a Changelog and leaks no machine-specific identity."""
     body = CHANGELOG.read_text()
