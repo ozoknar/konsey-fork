@@ -153,6 +153,11 @@ name = "claude"
 cli  = "claude"
 role = "lead"
 
+[[agents]]                  # a 2nd provider so the lead's work can be cross-verified
+name = "codex"
+cli  = "codex"
+role = "critic"
+
 [[projects]]                # a project name alone never implies phi
 match = "infra/*"
 risk  = "production"
