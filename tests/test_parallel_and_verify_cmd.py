@@ -75,29 +75,34 @@ def test_parallel_default_is_off():
     assert Config().parallel_plan is False          # opt-in, never on by surprise
 
 
-def test_parallel_plan_is_concurrent(tmp_path, monkeypatch):
-    cfg = _plan_cfg(tmp_path, parallel=True)
+def test_parallel_plan_is_materially_faster_than_serial(tmp_path, monkeypatch):
+    """Self-calibrating concurrency proof. Measure BOTH the serial and the parallel plan on
+    THIS machine and assert the *difference* — not an absolute wall-clock bound (those are
+    flaky on a loaded CI runner). Both paths do the identical setup + 3 serial audit writes,
+    so fixed overhead CANCELS in the subtraction; only the provider sleeps differ (3×D serial
+    vs ≈1×D concurrent), leaving a saving of ≈2×D. With D=0.2s the theoretical saving is
+    ≈0.4s; we require a robust floor of 0.25s, which a genuine fan-out always clears and a
+    serial loop never can."""
+    D = 0.2
     monkeypatch.setattr(graph, "available", lambda c: {"a": True, "b": True, "c": True})
-    monkeypatch.setattr("council.adapters.adapter_for", lambda c, name: _SleepyAdapter(name, 0.2))
-    state = _seed_state(cfg)
-    t0 = time.time()
-    out = graph.plan(state, cfg)
-    elapsed = time.time() - t0
-    assert set(out["plans"]) == {"a", "b", "c"}
-    assert out["providers_ok"] == 3
-    # 3 × 0.2 s serial = 0.6 s; concurrent ≈ 0.2 s. Generous bound to stay non-flaky.
-    assert elapsed < 0.45, f"fan-out was not concurrent ({elapsed:.2f}s ~ serial 0.6s)"
+    monkeypatch.setattr("council.adapters.adapter_for", lambda c, name: _SleepyAdapter(name, D))
 
+    def _time(parallel: bool):
+        cfg = _plan_cfg(tmp_path / ("par" if parallel else "ser"), parallel=parallel)
+        t0 = time.time()
+        out = graph.plan(_seed_state(cfg), cfg)
+        return time.time() - t0, out
 
-def test_serial_plan_is_sequential(tmp_path, monkeypatch):
-    cfg = _plan_cfg(tmp_path, parallel=False)
-    monkeypatch.setattr(graph, "available", lambda c: {"a": True, "b": True, "c": True})
-    monkeypatch.setattr("council.adapters.adapter_for", lambda c, name: _SleepyAdapter(name, 0.2))
-    t0 = time.time()
-    out = graph.plan(_seed_state(cfg), cfg)
-    elapsed = time.time() - t0
-    assert set(out["plans"]) == {"a", "b", "c"}
-    assert elapsed > 0.5, f"serial path unexpectedly fast ({elapsed:.2f}s)"   # ~0.6s
+    t_serial, ser = _time(False)
+    t_parallel, par = _time(True)
+    # correctness is identical on both paths
+    assert set(ser["plans"]) == set(par["plans"]) == {"a", "b", "c"}
+    assert ser["providers_ok"] == par["providers_ok"] == 3
+    # the fan-out saved at least ~half the theoretical concurrency gain (overhead cancels)
+    saving = t_serial - t_parallel
+    assert saving > 0.25, (
+        f"fan-out saved only {saving:.2f}s (serial={t_serial:.2f}s parallel={t_parallel:.2f}s) "
+        f"— not materially concurrent")
 
 
 def test_parallel_plan_keeps_roster_deterministic_order(tmp_path, monkeypatch):
