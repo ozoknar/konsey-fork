@@ -175,7 +175,11 @@ class GenericCLIAdapter(AgentAdapter):
         if not self.cfg.unsafe_inherit_provider_config:
             if self.name == "claude":
                 if len(argv) > 1 and argv[0] == self.cli:
-                    argv = [argv[0], "--strict-mcp-config", "--setting-sources", "none"] + argv[1:]
+                    # --setting-sources takes a comma-separated list (user|project|local);
+                    # the EMPTY string loads none → isolation. ``none`` is NOT a valid value
+                    # and makes the claude CLI error out (it rejects the argument and the
+                    # provider call fails) — found by a live run, the gate-test≠real-test catch.
+                    argv = [argv[0], "--strict-mcp-config", "--setting-sources", ""] + argv[1:]
             elif self.name == "codex":
                 if len(argv) > 1 and argv[0] == self.cli:
                     try:

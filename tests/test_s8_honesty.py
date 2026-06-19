@@ -41,3 +41,18 @@ def test_core_value_honesty_callout_present():
     assert "does not shell out" in en
     assert "opt-in" in en
     assert "Phase 2" in en          # fan-out / graph integration deferred
+
+
+def test_node_isolation_enforcement_not_falsely_marked_deferred():
+    """Docs-match-reality (Art 2.1): the PR2 isolation ENFORCEMENT argv is shipped in
+    adapters.py — the docs must not still call it "deferred". Guards against the exact
+    doc↔code contradiction a council re-evaluation surfaced (KNOWN_ISSUES said "deferred
+    (PR2)" while adapters.py already injected the isolation flags)."""
+    adapters_src = (REPO / "council" / "adapters.py").read_text(encoding="utf-8")
+    shipped = ("--strict-mcp-config" in adapters_src) and ("--ignore-user-config" in adapters_src)
+    assert shipped, "isolation enforcement argv is missing from adapters.py"
+    ki = KNOWN_ISSUES.read_text(encoding="utf-8")
+    # the stale phrasing that contradicted the shipped code must be gone
+    assert "Deferred (PR2):" not in ki, \
+        "KNOWN_ISSUES still calls isolation enforcement deferred while adapters.py ships it"
+    assert "enforcement deferred to PR2" not in ki

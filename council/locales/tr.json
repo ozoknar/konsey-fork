@@ -103,7 +103,7 @@
   "cli.doctor.graph_ok": "graph: build() + adapters.adapter_for içe aktarılabilir",
   "cli.doctor.header": "council doctor — kanıt-temelli sağlık kontrolü\n",
   "cli.doctor.isolation_clean": "düğüm izolasyonu: düğüme sızacak host AI-yapılandırması saptanmadı (Madde 2.6)",
-  "cli.doctor.isolation_leak": "⚠ düğüm izolasyonu: {n} host AI-yapılandırma dosyası sağlayıcı düğümlerine sızar ({summary}) — çapraz-sağlayıcı bağımsızlığı (Madde 2.2) adapter izolasyonu gelene kadar risk altında; bkz. KNOWN_ISSUES.md (node-isolation).",
+  "cli.doctor.isolation_leak": "⚠ düğüm izolasyonu: {n} host AI-yapılandırma dosyası izolasyon kapalıyken sağlayıcı düğümlerine sızabilir ({summary}) — çağrı-başına izolasyon argv/env varsayılan olarak ENJEKTE EDİLİR (unsafe_inherit_provider_config ile devre dışı); bkz. KNOWN_ISSUES.md (node-isolation).",
   "cli.doctor.no_providers": "⚠ 0 sağlayıcı çalıştırılabilir — konsey HENÜZ görev çalıştıramaz; en az bir CLI kurun (örn. claude / codex / gemini) ve `council doctor`'ı yeniden çalıştırın. (danışman modu)",
   "cli.doctor.one_provider": "⚠ danışman modu: yalnız {n} sağlayıcı çalıştırılabilir — çapraz-doğrulama yok, güven tavanı {cap}; tam konsey için 2. sağlayıcı ekleyin.",
   "cli.doctor.owner_line": "owner: {owner}  locale: {locale}  regime: {regime}",

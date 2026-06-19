@@ -103,7 +103,7 @@
   "cli.doctor.graph_ok": "graph: build() + adapters.adapter_for importable",
   "cli.doctor.header": "council doctor — evidence-based health check\n",
   "cli.doctor.isolation_clean": "node isolation: no host AI-config detected that would leak into a node (Article 2.6)",
-  "cli.doctor.isolation_leak": "⚠ node isolation: {n} host AI-config file(s) would leak into provider nodes ({summary}) — cross-provider independence (Article 2.2) is at risk until adapter isolation lands; see KNOWN_ISSUES.md (node-isolation).",
+  "cli.doctor.isolation_leak": "⚠ node isolation: {n} host AI-config file(s) would leak into provider nodes ({summary}) if isolation were off — per-call isolation argv/env IS injected by default (opt out via unsafe_inherit_provider_config); see KNOWN_ISSUES.md (node-isolation).",
   "cli.doctor.no_providers": "⚠ 0 providers runnable — council CANNOT run tasks yet; install at least one CLI (e.g. claude / codex / gemini) and re-run `council doctor`. (advisory mode)",
   "cli.doctor.one_provider": "⚠ advisory mode: only {n} provider runnable — no cross-validation, confidence capped at {cap}; add a 2nd provider for full council.",
   "cli.doctor.owner_line": "owner: {owner}  locale: {locale}  regime: {regime}",

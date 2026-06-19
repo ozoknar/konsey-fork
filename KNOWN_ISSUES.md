@@ -57,23 +57,26 @@
   via the opt-in `KONSEY_LIVE_REPAIR` smoke; unit tests use an injected runner. Do not run
   `--fix` against a repo holding uncommitted work you cannot afford to lose (it refuses on a
   dirty tree unless `--force`).
-- **node-isolation — Art. 2.6 enforcement deferred to PR2 (detection shipped).** A node
-  subprocess (claude/codex/agy) currently inherits the full host environment
-  (`adapters.py:_env`) and the host's AI instruction files (`CLAUDE.md`/`AGENTS.md`/
-  `GEMINI.md`), settings/hooks and MCP — verified by behavioural probe (`claude -p`
-  leaked the host CLAUDE.md persona; `codex debug prompt-input` showed global+repo
-  `AGENTS.md` injected). This collapses the cross-provider independence Art. 2.2
-  requires. **Shipped (PR1):** detection — `council/isolation.py` + a non-fatal ⚠ in
-  `council doctor` + an install-time list in `council init`, plus the Art. 2.6 doctrine.
-  **Deferred (PR2):** *enforcement* — isolated argv + env allow-list + clean CWD per
-  provider (claude `--strict-mcp-config`/`--setting-sources`; codex isolated
-  `CODEX_HOME` + `-c project_doc_max_bytes=0` + `--ignore-user-config` + clean `-C`; agy
-  clean HOME, no native flag), default-on with an explicit `--unsafe-inherit-provider-config`
-  opt-in, and an audited isolation manifest; plus **repo-bound scope** for the project-config
-  parent-walk (the PR1 detector walks cwd to the filesystem root, which can over-detect
-  ancestor configs above the repo/`$HOME` — acceptable for a warning, to be tightened to the
-  git-repo boundary). Until PR2 lands: do not assume nodes are independent of the host
-  machine's AI config.
+- **node-isolation — detection (PR1) AND enforcement argv/env (PR2) are shipped; full
+  behavioural cross-surface smoke is the remaining open item.** A node subprocess
+  inherits the host environment by default unless isolated. **Shipped (PR1):** detection —
+  `council/isolation.py` + a non-fatal ⚠ in `council doctor` + an install-time list in
+  `council init`, plus the Art. 2.6 doctrine. **Shipped (PR2):** *enforcement* — the
+  isolation argv/env is now INJECTED in `adapters.py:GenericCLIAdapter._argv`/`_env`
+  (claude `--strict-mcp-config --setting-sources none`; codex `--ignore-user-config`
+  + `-c project_doc_max_bytes=0` + isolated `CODEX_HOME`/`-C`; google/agy HOME-only, as
+  it has no native config-suppression flag), default-ON with an explicit
+  `unsafe_inherit_provider_config` opt-OUT. The flag injection is asserted by
+  `tests/test_adapters_isolation.py` (and a regression guard in `tests/test_s8_honesty.py`
+  keeps the docs from drifting back to "deferred"). **Still open:** (a) a *behavioural*
+  cross-surface smoke proving each provider CLI fully suppresses every host-config surface
+  (the argv is verified to be injected; per-CLI efficacy is the CLI's flag semantics and is
+  not yet end-to-end proven for all surfaces); (b) **repo-bound scope** for the
+  project-config parent-walk (the detector walks cwd to the filesystem root, which can
+  over-detect ancestor configs above the repo/`$HOME` — acceptable for a warning, to be
+  tightened to the git-repo boundary). The doctor leak *detector* is independent of the
+  per-call argv suppression: it reports that host config FILES exist, not that they WILL
+  leak through an isolated node.
 - **Art. 6.2 EXECUTE sandbox not yet enforced.** `exec_sandbox` exists in `Config` but is
   not wired into an execution path, because this MVP's orchestrator only invokes **provider
   CLIs** (claude/codex/agy) — it does not run arbitrary shell extracted from model output.

@@ -144,6 +144,9 @@ locale = "en"               # en | tr
 data_regime = "standard"    # standard | kvkk | gdpr | hipaa
 exec_sandbox = "off"        # off | read-only | workspace-write
 autocapture_enabled = false # opt-in; default OFF
+parallel_plan = false       # opt-in: run the PLAN providers concurrently (default OFF)
+verify_cmd = ""             # opt-in: a real acceptance command at VERIFY; its exit code
+                            #   is authoritative over the LLM verdict (gate-test ≠ real-test)
 
 [[agents]]                  # generic role → provider; producer is never its sole verifier
 name = "claude"
