@@ -85,20 +85,30 @@ def _killcheck(s: S, cfg: Config) -> dict:
     return {}
 
 
-def _ask(s: S, cfg: Config, agent: str, prompt_text: str, mtype: str, timeout: int = 180) -> tuple[str, dict]:
-    """Run one adapter, audit the message + a terminal-exit evidence row, and return
-    ``(text, aggregate-delta)``. Adapter resolution goes through the vendor-neutral
-    registry (``adapters.adapter_for``); a missing CLI degrades to a tool failure
-    rather than crashing the graph (Article 2.3).
+def _invoke(cfg: Config, agent: str, prompt_text: str, timeout: int = 180):
+    """Run ONE adapter subprocess and return its raw ``AgentResult`` — NO audit writes.
+
+    This is the *pure, side-effect-free* half of an agent call: it touches no session
+    state and no DuckDB. That is what makes it safe to fan several of these out
+    concurrently (``plan`` with ``parallel_plan``) — the slow part is the provider
+    subprocess (I/O-bound, GIL released), while every append-only audit write stays on
+    the orchestrator thread via ``_record`` (single-writer DuckDB, Article 10/2.4).
+    Adapter resolution goes through the vendor-neutral registry; a missing CLI degrades
+    to a tool failure rather than crashing the graph (Article 2.3)."""
+    from .adapters import adapter_for  # lazy: keeps build(cfg) importable before adapters lands
+
+    return adapter_for(cfg, agent).run(prompt_text, timeout=timeout)
+
+
+def _record(s: S, cfg: Config, agent: str, r, mtype: str) -> tuple[str, dict]:
+    """Audit one adapter result (MUST run on the orchestrator thread) and return
+    ``(untrusted-wrapped text, aggregate-delta)``.
 
     EXECUTE security boundary (Article 6.2): the adapter's output is **untrusted
     external data**. Secrets are redacted before anything is written to the audit log
     (6.2.5) and the returned text is wrapped with ``mark_untrusted`` so any embedded
     "new instruction / run this" content is treated as data, not a directive, when it
     is fed into the next agent's prompt (6.2.3)."""
-    from .adapters import adapter_for  # lazy: keeps build(cfg) importable before adapters lands
-
-    r = adapter_for(cfg, agent).run(prompt_text, timeout=timeout)
     sid = s["session_id"]
     # 6.2.5: redact secrets before the model output touches the audit log.
     safe_text = redact_secrets(r.text)
@@ -110,6 +120,12 @@ def _ask(s: S, cfg: Config, agent: str, prompt_text: str, mtype: str, timeout: i
     # as data, not instructions. Already secret-redacted.
     return mark_untrusted(safe_text), {"calls": 1, "tool_failures": 0 if r.ok else 1,
                                        "evidence": [ev], "_ok": r.ok}
+
+
+def _ask(s: S, cfg: Config, agent: str, prompt_text: str, mtype: str, timeout: int = 180) -> tuple[str, dict]:
+    """Serial convenience: invoke one adapter and record it (the non-fan-out call path
+    used by CRITIQUE / SYNTHESIZE / EXECUTE / VERIFY)."""
+    return _record(s, cfg, agent, _invoke(cfg, agent, prompt_text, timeout=timeout), mtype)
 
 
 def _first(names: list[str], avail: dict[str, bool]) -> str | None:
@@ -163,8 +179,24 @@ def plan(s: S, cfg: Config) -> dict:
         # No declared leads available → fall back to any available enabled agent so a
         # minimal/advisory roster still produces a plan instead of silently doing nothing.
         leads = [a.name for a in cfg.agents if a.enabled and avail.get(a.name)]
-    for agent in leads:
-        text, d = _ask(s, cfg, agent, prompts.prompt("plan", cat, task=s["task"]), "plan")
+    prompt_text = prompts.prompt("plan", cat, task=s["task"])
+
+    # Fan the provider subprocesses out CONCURRENTLY when opted in (``parallel_plan``,
+    # default OFF). Only the side-effect-free ``_invoke`` runs off-thread; every audit
+    # write (``_record``) happens HERE, on the orchestrator thread, in roster order — so
+    # the append-only DuckDB stays a single writer (no lock contention) and the audit
+    # sequence is deterministic regardless of which provider returns first (Article 2.4/10).
+    if cfg.parallel_plan and len(leads) > 1:
+        from concurrent.futures import ThreadPoolExecutor
+        workers = min(len(leads), max(1, cfg.parallel_plan_max))
+        with ThreadPoolExecutor(max_workers=workers) as ex:
+            futures = {agent: ex.submit(_invoke, cfg, agent, prompt_text) for agent in leads}
+            results = [(agent, futures[agent].result()) for agent in leads]  # roster order
+    else:
+        results = [(agent, _invoke(cfg, agent, prompt_text)) for agent in leads]
+
+    for agent, r in results:
+        text, d = _record(s, cfg, agent, r, "plan")
         plans[agent] = text
         ok_count += 1 if d.pop("_ok") else 0
         for key in ("calls", "tool_failures"):
@@ -250,40 +282,97 @@ def execute(s: S, cfg: Config) -> dict:
     return out
 
 
+def _run_verify_cmd(s: S, cfg: Config) -> tuple[bool, bool, str]:
+    """Run the operator-configured acceptance command as REAL evidence (Article 2.1/2.7).
+
+    Returns ``(ran, ok, summary)``; ``(False, False, "")`` when no ``verify_cmd`` is set
+    (the default — fully backward-compatible, LLM-only verify).
+
+    Safety boundary (the same trust class as ``konsey do``'s acceptance check, NOT
+    arbitrary model-output shell): the command is **operator config**, not model output;
+    it is gated through the exec_policy hard-floor (``repair.gate_command`` — a
+    destructive shape is refused, never run, and raises an incident); it runs with NO
+    shell (``shlex.split`` via ``execute._default_acceptance``); and only its EXIT CODE is
+    consumed (stdout is captured-and-discarded by the runner, so no command output can
+    leak into the audit log or a downstream prompt). The exit code is the authoritative
+    verdict — an LLM "looks correct" can never override a failing real check
+    (gate-test ≠ real-test)."""
+    cmd = (cfg.verify_cmd or "").strip()
+    if not cmd:
+        return False, False, ""
+    from . import repair
+    from .execute import _default_acceptance
+    verdict, rules = repair.gate_command(cmd)
+    if verdict != "allowed":
+        audit.incident(s["session_id"], "verify_cmd_refused",
+                       f"verify_cmd refused (destructive shape): {rules}", cfg=cfg)
+        return True, False, f"verify_cmd refused (destructive shape): {rules}"
+    import os
+    timeout = int(s.get("budget", {}).get("max_wall_s") or 600)
+    rc = _default_acceptance(cmd, timeout)(os.getcwd())
+    # cmd is operator config; redact defensively before it reaches the audit log.
+    audit.evidence(s["session_id"], "verify_cmd", redact_secrets(f"rc={rc} cmd={cmd}"),
+                   produced_by="harness", verified_by="harness", cfg=cfg)
+    return True, rc == 0, f"verify_cmd `{cmd}` rc={rc}"
+
+
 def verify(s: S, cfg: Config) -> dict:
     if _dead(s):
         return {}
     avail = available(cfg)
     cat = load_catalog(cfg)
     executor = s.get("executor", "")
-    # Cross-verification: producer ≠ verifier. cfg.verifier(exclude=) enforces the
-    # invariant in the role layer; None → advisory mode (no independent verifier).
+    sid = s["session_id"]
+    retries = s.get("verify_retries", 0) + 1
+
+    # (1) Real-evidence command (opt-in). When set, its EXIT CODE is the authoritative
+    #     verdict — it overrides any LLM opinion below (Article 2.1/2.7, evidence>consensus).
+    cmd_ran, cmd_ok, cmd_summary = _run_verify_cmd(s, cfg)
+
+    # (2) Independent LLM cross-verifier: producer ≠ verifier. cfg.verifier(exclude=)
+    #     enforces the invariant in the role layer; None → no independent verifier.
     verifier = cfg.verifier(exclude=executor)
     if verifier and not avail.get(verifier):
         # declared verifier is not on PATH → try any other available agent
         verifier = _first([a.name for a in cfg.agents if a.enabled and a.name != executor], avail)
+
+    llm_verdict = ""
+    agg: dict[str, Any] = {"calls": 0, "tool_failures": 0, "evidence": []}
+    llm_ok = False
+    if verifier:
+        text, d = _ask(s, cfg, verifier,
+                       prompts.prompt("verify", cat, task=s["task"], execution=s.get("execution", "")[:2500]),
+                       "verify")
+        llm_verdict = text
+        # The verifier's VERDICT line is the BODY of the untrusted-data envelope (_ask wraps
+        # every adapter output via mark_untrusted) — unwrap before reading the first-line
+        # verdict, otherwise the envelope marker is line 0 and a PASS can never be detected.
+        llm_ok = "PASS" in unwrap_untrusted(text).split("\n", 1)[0].upper()
+        agg = {"calls": d["calls"], "tool_failures": d["tool_failures"], "evidence": d["evidence"]}
+
+    # (3) Combine. Command exit-code wins when it ran; else the LLM verdict; with neither,
+    #     advisory (no cross-verification → decide() applies the Art.7.2 confidence cap).
+    if cmd_ran:
+        verdict = (cmd_summary + (" | " + llm_verdict if llm_verdict else "")).strip()
+        if cmd_ok:
+            audit.evidence(sid, "cross_validation", f"verify_cmd PASS ({cmd_summary})",
+                           "harness", "orchestrator", cfg=cfg)
+        return {"verify_verdict": verdict, "verify_ok": cmd_ok, "verify_retries": retries, **agg}
+
     if not verifier:
-        # No independent verifier available → cannot cross-validate. Mark advisory and
-        # record verify_ok=False so decide() applies the no-cross-verification cap (Art.7.2).
+        # No real command AND no independent verifier → cannot cross-validate. Mark advisory
+        # and record verify_ok=False so decide() applies the no-cross-verification cap (Art.7.2).
         return {"verify_verdict": t(cat, "graph.verify_advisory_verdict"),
                 "verify_ok": False,
-                "verify_retries": s.get("verify_retries", 0) + 1,
+                "verify_retries": retries,
                 "advisory": True,
                 "advisory_reason": s.get("advisory_reason")
                 or t(cat, "graph.verify_advisory_reason")}
-    text, d = _ask(s, cfg, verifier,
-                   prompts.prompt("verify", cat, task=s["task"], execution=s.get("execution", "")[:2500]),
-                   "verify")
-    # The verifier's VERDICT line is the BODY of the untrusted-data envelope (_ask wraps
-    # every adapter output via mark_untrusted) — unwrap before reading the first-line verdict,
-    # otherwise the envelope marker is always line 0 and a PASS can never be detected.
-    ok = "PASS" in unwrap_untrusted(text).split("\n", 1)[0].upper()
-    if ok:
-        audit.evidence(s["session_id"], "cross_validation", f"{verifier} VERDICT PASS", verifier,
+
+    if llm_ok:
+        audit.evidence(sid, "cross_validation", f"{verifier} VERDICT PASS", verifier,
                        "orchestrator", cfg=cfg)
-    return {"verify_verdict": text, "verify_ok": ok,
-            "verify_retries": s.get("verify_retries", 0) + 1,
-            "calls": d["calls"], "tool_failures": d["tool_failures"], "evidence": d["evidence"]}
+    return {"verify_verdict": llm_verdict, "verify_ok": llm_ok, "verify_retries": retries, **agg}
 
 
 def route_after_verify(s: S, cfg: Config) -> str:

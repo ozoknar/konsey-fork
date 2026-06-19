@@ -115,7 +115,10 @@ def test_node_isolation_argv_modification():
     argv = ad_claude._argv("test prompt", 180)
     assert "--strict-mcp-config" in argv
     assert "--setting-sources" in argv
-    assert "none" in argv
+    # EMPTY string = load no setting sources (isolation). "none" is INVALID for the real
+    # claude CLI and breaks the provider call (live-verified), so it must NOT be emitted.
+    assert argv[argv.index("--setting-sources") + 1] == ""
+    assert "none" not in argv
 
     # 2. Claude unsafe/inherited argv
     ad_claude_unsafe = GenericCLIAdapter(name="claude", cli="claude", cfg=cfg_unsafe)

@@ -104,6 +104,9 @@ class Config:
     exec_sandbox: str = "off"               # off|read-only|workspace-write (Md.6.2)
     autocapture_enabled: bool = False       # opt-in; default OFF (Md.0.7)
     unsafe_inherit_provider_config: bool = False # opt-in: do not isolate node subprocess environment (PR2)
+    parallel_plan: bool = False             # opt-in: fan the PLAN providers out concurrently (default OFF, Md.3)
+    parallel_plan_max: int = 4              # concurrency cap for the PLAN fan-out (bounded resource use)
+    verify_cmd: str = ""                    # opt-in: real acceptance command run at VERIFY (exit-code > LLM, Md.2.1/2.7)
     extra_path: str = field(default_factory=_default_extra_path)
     budgets: dict[str, dict[str, Any]] = field(default_factory=dict)
     # thresholds (per-instance, default to module constants)
@@ -159,12 +162,19 @@ class Config:
 
 def _coerce_agents(raw: Any) -> list[RosterEntry]:
     out: list[RosterEntry] = []
+    seen: set[str] = set()
     for item in raw or []:
         if not isinstance(item, dict):
             continue
         name = str(item.get("name", "")).strip()
         if not name:
             continue
+        # Logical name is the key the orchestrator indexes by (plans[name],
+        # verifier(exclude=name)); a duplicate would silently overwrite a prior plan and
+        # could collapse producer≠verifier. Keep the FIRST entry, drop later collisions.
+        if name in seen:
+            continue
+        seen.add(name)
         out.append(RosterEntry(
             name=name,
             cli=str(item.get("cli", name)).strip() or name,
@@ -239,6 +249,9 @@ def load_config(path: str | os.PathLike[str] | None = None) -> Config:
         exec_sandbox=str(data.get("exec_sandbox", base.exec_sandbox)) or base.exec_sandbox,
         autocapture_enabled=bool(data.get("autocapture_enabled", base.autocapture_enabled)),
         unsafe_inherit_provider_config=bool(data.get("unsafe_inherit_provider_config", base.unsafe_inherit_provider_config)),
+        parallel_plan=bool(data.get("parallel_plan", base.parallel_plan)),
+        parallel_plan_max=max(1, int(data.get("parallel_plan_max", base.parallel_plan_max))),
+        verify_cmd=str(data.get("verify_cmd", base.verify_cmd)) or base.verify_cmd,
         extra_path=str(data.get("extra_path", base.extra_path)) or base.extra_path,
         budgets=dict(data.get("budgets", base.budgets)),
         max_verify_retries=int(data.get("max_verify_retries", base.max_verify_retries)),

@@ -10,6 +10,63 @@ unverified "it works" claims. Test evidence is cited where it backs an entry.
 
 ## [Unreleased] — Phase 2 (in progress)
 
+### Added
+
+- **Opt-in concurrent PLAN fan-out (`parallel_plan`, default OFF).** When enabled, the
+  PLAN node runs each lead provider's subprocess *concurrently* instead of one-after-another
+  (wall-clock ≈ slowest provider, not the sum). Only the side-effect-free adapter
+  subprocess (`graph._invoke`) runs off-thread; every append-only audit write
+  (`graph._record`) stays on the orchestrator thread, in **roster order** — so the
+  single-writer DuckDB never contends and the audit/evidence sequence is deterministic
+  regardless of which provider returns first. Bounded by `parallel_plan_max` (default 4).
+  This is concurrent *reasoning* dispatch — NOT cross-provider work fan-out (still Phase 2).
+  Evidence: `tests/test_parallel_and_verify_cmd.py` (concurrency, roster-order determinism,
+  serial/parallel agreement, default-OFF).
+- **Opt-in real-evidence VERIFY command (`verify_cmd`, default empty).** VERIFY can run an
+  operator-configured acceptance command (e.g. `pytest -q`) whose **exit code is the
+  authoritative verdict** — an LLM "looks correct" can never override a failing real check
+  (Constitution Art. 2.1/2.7, evidence > consensus; gate-test ≠ real-test). The command is
+  operator config (NOT model output), gated through the `exec_policy` hard-floor
+  (`repair.gate_command` — a destructive shape is refused with an incident, never run),
+  run with NO shell (`shlex.split`), and its exit code recorded as append-only evidence.
+  Empty `verify_cmd` is fully backward-compatible (LLM-only verify, unchanged). Evidence:
+  `tests/test_parallel_and_verify_cmd.py` (exit-code overrides LLM both directions,
+  destructive refused, evidence recorded, backward-compatible).
+- **Roster duplicate-name dedupe.** `_coerce_agents` now drops later collisions on a
+  logical agent name (keeps the first), so a duplicated roster name can no longer silently
+  overwrite a plan or collapse producer≠verifier. Evidence: `tests/test_hardening_small.py`.
+- **Watchdog grace-floor + regime path-traversal regression tests.** Lock in two existing
+  safety boundaries with explicit assertions: the watchdog reaps only past BOTH the wall
+  budget AND `MIN_STALL_IDLE_S` (a briefly-idle run is never falsely reaped), and a
+  path-traversal `data_regime` resolves to no terms (cannot escape `regimes/`). Evidence:
+  `tests/test_watchdog_grace_invariant.py`, `tests/test_hardening_small.py`.
+
+### Fixed
+
+- **claude node-isolation argv used an INVALID `--setting-sources` value (provider-breaking).**
+  The isolation injection passed `--setting-sources none`, but the claude CLI rejects
+  `none` (`Invalid setting source: none. Valid options are: user, project, local`) — so
+  with default isolation ON, **every claude provider call failed** (an always-on,
+  silently-fatal break). A live end-to-end `konsey run` surfaced it (the exact
+  gate-test ≠ real-test lesson: the unit test asserted the flag was *injected*, not that
+  the real CLI *accepts* it). Fixed to `--setting-sources ""` (the empty list = load no
+  setting sources = the intended isolation), verified live: claude now runs under
+  isolation and a full 9-state `konsey run` completes. Tests updated to assert the
+  live-verified value.
+
+### Changed
+
+- **Honesty pass — node-isolation enforcement is shipped, not "deferred (PR2)" (Art. 2.1).**
+  `adapters.py` already injects the per-provider isolation argv/env (claude
+  `--strict-mcp-config --setting-sources none`; codex `--ignore-user-config` +
+  `project_doc_max_bytes=0` + isolated `CODEX_HOME`/`-C`), default-ON behind the
+  `unsafe_inherit_provider_config` opt-out — but KNOWN_ISSUES and `test_isolation.py` still
+  called enforcement "deferred to PR2". A council re-evaluation flagged the doc↔code
+  contradiction; the docs are corrected to match the shipped reality (the behavioural
+  cross-surface smoke remains the honest open item). Evidence:
+  `tests/test_adapters_isolation.py` (the flags are injected) + a regression guard in
+  `tests/test_s8_honesty.py` (docs may not drift back to "deferred").
+
 ### Removed
 
 - **Dead `council/run.py` module (tech-debt; autonomous cycle 2).** A vestigial headless

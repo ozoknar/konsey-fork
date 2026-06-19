@@ -6,8 +6,9 @@ detection is deterministic (only existing paths reported), the ``node:count`` su
 is stable, and ``council doctor`` surfaces a leak as a **non-fatal ⚠** (never a ✗),
 matching the regime-warning render contract.
 
-Scope note: this is detection only. Enforcement (isolated argv/env/cwd in the adapter
-layer) is PR2 — see KNOWN_ISSUES.md (node-isolation).
+Scope note: these tests cover the DETECTION layer. The enforcement layer (isolated
+argv/env/cwd injected in the adapter) is shipped separately and asserted in
+``tests/test_adapters_isolation.py`` — see KNOWN_ISSUES.md (node-isolation).
 """
 from __future__ import annotations
 
