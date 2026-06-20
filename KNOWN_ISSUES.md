@@ -120,6 +120,21 @@
 
 ## Resolved in Phase 2 (moved out of the backlog above — fixed + verified)
 
+- **iCloud `UF_HIDDEN` flag broke the editable install (`ModuleNotFoundError: council.cli`),
+  2026-06-10.** Symptom: every `konsey`/`council` invocation died at import. Root cause chain:
+  the repo lives under `~/Desktop` (iCloud-synced); fileproviderd stamps the macOS `UF_HIDDEN`
+  flag on **every** file in `.venv/lib/python3.12/site-packages/` (verified: a fresh `.txt` and
+  `.pth` both got flagged within ~2s, while a `/tmp` control file did not; `chflags nohidden`
+  is re-reverted by the daemon). Python 3.12.13's security hardening (site.py) **skips hidden
+  `.pth` files**, so `_editable_impl_konsey_cli.pth` was never processed and the project root
+  never reached `sys.path`; the stale `site-packages/council/` data dir (db/locales, no
+  `__init__.py`) then resolved as an empty namespace package. **Fix:** the venv launcher
+  (`.venv/bin/council`, symlinked from `~/.local/bin/{konsey,council}`) now does
+  `sys.path.insert(0, "<project root>")` before importing — immune to the flag because
+  `~/.local/bin` is outside iCloud. Verified: doctor + status + audit all pass on consecutive
+  runs from `$HOME`. Caveat: a future `pip install -e .` regenerates the launcher and drops the
+  patch — re-apply it (or move the venv outside any iCloud-synced path, the durable fix).
+
 - **`providers_ok` mis-counted cross-provider quorum (was: "only claude completes, codex+agy
   time out").** Symptom: three consecutive runs all reported `providers_ok=1` and a "claude
   (1 tamam)" node line, making the 3-agent quorum look unreachable. **Root cause — NOT a
