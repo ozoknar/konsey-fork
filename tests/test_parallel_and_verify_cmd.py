@@ -14,6 +14,7 @@ recorded as append-only evidence.
 """
 from __future__ import annotations
 
+import shlex
 import sys
 import time
 from pathlib import Path
@@ -134,7 +135,10 @@ _FULL_ROSTER = [RosterEntry("claude", "claude", ROLE_LEAD),
                 RosterEntry("codex", "codex", ROLE_CRITIC),
                 RosterEntry("google", "agy", ROLE_VERIFIER)]
 
-_PY = sys.executable
+# shlex.quote: verify_cmd is run with NO shell (shlex.split in _run_verify_cmd), so an
+# interpreter path containing spaces (e.g. a repo under "~/Desktop/mm cc projeleri/") must
+# be quoted or the path shatters into separate argv tokens and the command can never run.
+_PY = shlex.quote(sys.executable)
 _EXIT0 = f'{_PY} -c "import sys;sys.exit(0)"'
 _EXIT1 = f'{_PY} -c "import sys;sys.exit(1)"'
 
