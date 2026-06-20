@@ -71,7 +71,11 @@ def _run(agent: str, cmd: list[str], timeout: int, env: dict[str, str]) -> Agent
     cannot crash the council (Md.2.7 graceful degradation)."""
     t0 = time.time()
     try:
-        p = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout, env=env)
+        # stdin=DEVNULL: a headless provider CLI (codex/agy) that probes stdin must never
+        # block on the inherited terminal until the hard kill — close it so the call stays
+        # truly non-interactive (Md.2.7 graceful degradation; orthogonal to approval_policy).
+        p = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout, env=env,
+                           stdin=subprocess.DEVNULL)
         out = (p.stdout or "").strip()
         err = (p.stderr or "").strip()
         text = out if out else err
