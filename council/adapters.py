@@ -30,6 +30,7 @@ import os
 import subprocess
 import time
 from dataclasses import dataclass
+from pathlib import Path
 
 from .config import Config, available as _config_available
 
@@ -51,6 +52,69 @@ def _env(cfg: Config, agent_name: str | None = None, temp_home: str | None = Non
         elif agent_name == "codex":
             env["CODEX_HOME"] = temp_home
     return env
+
+
+# Host-relative credential paths re-seeded into a node's isolated home. Auth is NOT a
+# host-instruction leak (Art. 2.6 targets CLAUDE.md/AGENTS.md/GEMINI.md/settings/MCP),
+# but a clean HOME/CODEX_HOME also strips the provider's credentials — so the node fails
+# to authenticate (codex -> HTTP 401; agy/google -> "Authentication required") and
+# silently drops out of the quorum (providers_ok < 3). These are the minimal credential
+# paths, verified empirically, that let a node auth WITHOUT pulling in any instruction
+# file. For ``google`` the ``.gemini`` dir is curated to omit exactly the three
+# documented leak files, so isolation still holds.
+_GEMINI_LEAK_TOP = {"GEMINI.md"}
+_GEMINI_LEAK_AGCLI = {"settings.json", "mcp_config.json"}
+
+
+def _seed_isolated_auth(name: str, temp_home: str) -> None:
+    """Symlink the minimal provider credentials into the isolated ``temp_home``.
+
+    Side-effect-free on the host: only symlinks INTO ``temp_home`` are created (the real
+    credential files are never copied or modified), and a missing source is skipped so
+    the node degrades exactly as before (Md.2.7 graceful degradation). Restores auth
+    while keeping the host instruction/config surfaces suppressed (Art. 2.6)."""
+    real_home = Path(os.path.expanduser("~"))
+    temp = Path(temp_home)
+
+    def _link(src: Path, dst: Path) -> None:
+        try:
+            if not src.exists() or dst.exists() or dst.is_symlink():
+                return
+            dst.parent.mkdir(parents=True, exist_ok=True)
+            dst.symlink_to(src)
+        except OSError:
+            return
+
+    if name == "codex":
+        # CODEX_HOME == temp_home; codex reads its token from ``$CODEX_HOME/auth.json``.
+        # ``--ignore-user-config`` already suppresses config.toml/AGENTS.md, so only the
+        # credential file is restored.
+        _link(real_home / ".codex" / "auth.json", temp / "auth.json")
+    elif name == "google":
+        # agy (Antigravity CLI) resolves creds from ``$HOME/.gemini`` PLUS the macOS login
+        # keychain at ``$HOME/Library/Keychains`` (where the OAuth refresh token lives).
+        # Restore both, but rebuild ``.gemini`` as a curated dir that omits the three
+        # google leak files so host instructions/settings/MCP do not reach the node.
+        _link(real_home / "Library" / "Keychains", temp / "Library" / "Keychains")
+        src_gemini = real_home / ".gemini"
+        if src_gemini.is_dir():
+            dst_gemini = temp / ".gemini"
+            try:
+                dst_gemini.mkdir(parents=True, exist_ok=True)
+                for child in src_gemini.iterdir():
+                    if child.name in _GEMINI_LEAK_TOP:
+                        continue
+                    if child.name == "antigravity-cli" and child.is_dir():
+                        dst_ag = dst_gemini / "antigravity-cli"
+                        dst_ag.mkdir(parents=True, exist_ok=True)
+                        for sub in child.iterdir():
+                            if sub.name in _GEMINI_LEAK_AGCLI:
+                                continue
+                            _link(sub, dst_ag / sub.name)
+                    else:
+                        _link(child, dst_gemini / child.name)
+            except OSError:
+                return
 
 
 @dataclass
@@ -205,6 +269,10 @@ class GenericCLIAdapter(AgentAdapter):
         if not self.cfg.unsafe_inherit_provider_config:
             import tempfile
             temp_home = tempfile.mkdtemp(prefix=f"council-isolated-{self.name}-")
+            # Re-seed credentials into the clean home so the node can authenticate
+            # (auth is not an instruction-leak; without this codex 401s and agy hits
+            # "Authentication required", silently dropping the quorum below 3).
+            _seed_isolated_auth(self.name, temp_home)
 
         try:
             env = _env(self.cfg, self.name, temp_home)
