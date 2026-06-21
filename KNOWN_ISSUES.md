@@ -76,7 +76,15 @@
   over-detect ancestor configs above the repo/`$HOME` — acceptable for a warning, to be
   tightened to the git-repo boundary). The doctor leak *detector* is independent of the
   per-call argv suppression: it reports that host config FILES exist, not that they WILL
-  leak through an isolated node.
+  leak through an isolated node. **Credential re-seed (shipped):** a clean HOME/CODEX_HOME
+  also strips the provider's *auth*, which is NOT an instruction-leak — without restoring it
+  the node 401s (codex) / hits "Authentication required" (agy/google) and silently drops the
+  quorum below 3. `adapters._seed_isolated_auth` symlinks back ONLY the minimal credential
+  paths (codex `~/.codex/auth.json`; google `~/Library/Keychains` + a curated `~/.gemini`
+  that omits exactly the three google leak files), so auth works while isolation still holds.
+  Verified by a live `konsey run` reaching `providers_ok == 3` (claude+codex+agy, no authfail)
+  and by `tests/test_adapters_isolation.py` (seed restores creds, curates leaks, no-ops on a
+  missing source).
 - **Art. 6.2 EXECUTE sandbox not yet enforced.** `exec_sandbox` exists in `Config` but is
   not wired into an execution path, because this MVP's orchestrator only invokes **provider
   CLIs** (claude/codex/agy) — it does not run arbitrary shell extracted from model output.
