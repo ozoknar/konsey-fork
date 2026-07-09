@@ -32,6 +32,26 @@ unverified "it works" claims. Test evidence is cited where it backs an entry.
   Empty `verify_cmd` is fully backward-compatible (LLM-only verify, unchanged). Evidence:
   `tests/test_parallel_and_verify_cmd.py` (exit-code overrides LLM both directions,
   destructive refused, evidence recorded, backward-compatible).
+- **Opt-in concurrent VERIFY fan-out (`parallel_verify`, default OFF).** When enabled,
+  VERIFY asks *every* available non-executor agent independently instead of a single
+  producer≠verifier pick, so `n_crossverified` can genuinely exceed 1 (`decide.py`'s
+  `min(n_crossverified,3)*weight` scoring formula always supported this; VERIFY never
+  fanned out to use it). A split PASS/FAIL verdict across verifiers is **not**
+  majority-resolved (Article 7: evidence, not a vote) — it forces `human_required`
+  regardless of confidence, the same immutable-override pattern as a destructive command,
+  and both verdicts are recorded as dissents. Unanimous agreement (all PASS or all FAIL)
+  behaves like the existing single-verifier path, just with every vote counted. Bounded by
+  `parallel_verify_max` (default 4). Evidence: `tests/test_graph_orchestration.py`
+  (`test_parallel_verify_*` — off-by-default, agreement raises the cross-verify count,
+  disagreement escalates to a human + records dissents, unanimous FAIL still retries).
+- **`decide()` scoring weights moved from hardcoded literals to `Config`.** The additive
+  score (base 0.45, +0.15/crossverify, +0.05/evidence, +0.10 consensus, -0.10/dissent,
+  -0.15/tool_failure) is now `decide_base_score` / `decide_crossverify_weight` / etc. on
+  `Config`, mirroring the existing `confidence_floor`/`confidence_cap_noxval` pattern —
+  the module docstring already claimed these were "profile-overridable"; now they actually
+  are. Pure refactor: defaults are byte-identical to the old hardcoded values. Evidence:
+  `tests/test_decide.py` (`test_scoring_weights_default_to_the_old_hardcoded_values`,
+  `test_scoring_weights_are_tunable_per_instance`).
 - **Roster duplicate-name dedupe.** `_coerce_agents` now drops later collisions on a
   logical agent name (keeps the first), so a duplicated roster name can no longer silently
   overwrite a plan or collapse producer≠verifier. Evidence: `tests/test_hardening_small.py`.

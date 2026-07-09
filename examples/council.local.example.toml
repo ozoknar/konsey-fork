@@ -12,6 +12,9 @@ data_regime  = "standard"    # standard | kvkk | gdpr | hipaa  (regulated → re
 exec_sandbox = "off"         # off | read-only | workspace-write
 autocapture_enabled = false  # opt-in background distillation; default OFF
 parallel_plan = false        # opt-in: run the PLAN providers concurrently; default OFF
+parallel_verify = false      # opt-in: fan VERIFY out to every non-executor agent (not just
+                             #   one); default OFF. A split PASS/FAIL verdict is NOT
+                             #   majority-resolved — it escalates to a human (Art. 7).
 verify_cmd = ""              # opt-in: a real acceptance command at VERIFY (e.g. "pytest -q");
                              #   its exit code is authoritative over the LLM verdict
                              #   (gate-test != real-test). Empty = LLM-only verify.

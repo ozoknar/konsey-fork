@@ -56,6 +56,8 @@ class S(TypedDict, total=False):
     verify_verdict: str
     verify_ok: bool
     verify_retries: int
+    verify_pass_count: int       # parallel_verify: how many fanned-out verifiers said PASS
+    verify_disagreement: bool    # parallel_verify: fanned-out verifiers split PASS/FAIL — not auto-resolved
     decision: dict
     report: str
     t_start: float
@@ -363,8 +365,62 @@ def verify(s: S, cfg: Config) -> dict:
     #     verdict — it overrides any LLM opinion below (Article 2.1/2.7, evidence>consensus).
     cmd_ran, cmd_ok, cmd_summary = _run_verify_cmd(s, cfg)
 
-    # (2) Independent LLM cross-verifier: producer ≠ verifier. cfg.verifier(exclude=)
-    #     enforces the invariant in the role layer; None → no independent verifier.
+    # (2a) Opt-in fan-out (``parallel_verify``, default OFF): ask EVERY available
+    # non-executor agent independently instead of a single producer≠verifier pick, so
+    # ``n_crossverified`` can genuinely exceed 1 (decide.py's min(n,3)*weight formula has
+    # always supported this; VERIFY just never fanned out to use it). Disagreement between
+    # verifiers is a real signal, not noise to vote away (Article 7: evidence, not a vote) —
+    # it is NOT auto-resolved by majority; it forces human_required in decide_node()
+    # regardless of confidence, the same immutable-override pattern as a destructive command.
+    if not cmd_ran and cfg.parallel_verify:
+        fanout = [a.name for a in cfg.agents if a.enabled and a.name != executor and avail.get(a.name)]
+        if len(fanout) > 1:
+            prompt_text = prompts.prompt("verify", cat, task=s["task"],
+                                         execution=s.get("execution", "")[:2500])
+            from concurrent.futures import ThreadPoolExecutor
+            workers = min(len(fanout), max(1, cfg.parallel_verify_max))
+            with ThreadPoolExecutor(max_workers=workers) as ex:
+                futures = {agent: ex.submit(_invoke, cfg, agent, prompt_text) for agent in fanout}
+                results = [(agent, futures[agent].result()) for agent in fanout]  # roster order
+
+            agg = {"calls": 0, "tool_failures": 0, "evidence": []}
+            verdicts: dict[str, tuple[bool, str]] = {}
+            for agent, r in results:
+                text, d = _record(s, cfg, agent, r, "verify")
+                ok = "PASS" in unwrap_untrusted(text).split("\n", 1)[0].upper()
+                verdicts[agent] = (ok, text)
+                for key in ("calls", "tool_failures"):
+                    agg[key] += d[key]
+                agg["evidence"] += d["evidence"]
+
+            pass_count = sum(1 for ok, _ in verdicts.values() if ok)
+            disagreement = 0 < pass_count < len(verdicts)
+            combined_verdict = " | ".join(
+                f"{agent}: {'PASS' if ok else 'FAIL'}" for agent, (ok, _) in verdicts.items())
+            out: dict[str, Any] = {
+                "verify_verdict": combined_verdict,
+                "verify_ok": pass_count > 0,          # at least one PASS → do not blind-retry;
+                                                        # a split verdict escalates instead (below)
+                "verify_retries": retries,
+                "verify_pass_count": pass_count,
+                "verify_disagreement": disagreement,
+                **agg,
+            }
+            if disagreement:
+                dissents = []
+                for agent, (ok, text) in verdicts.items():
+                    rationale = f"verify {'PASS' if ok else 'FAIL'}: {unwrap_untrusted(text)[:300]}"
+                    audit.dissent(sid, agent, rationale, cfg=cfg)
+                    dissents.append({"agent": agent, "rationale": rationale})
+                out["dissents"] = dissents
+            if pass_count > 0:
+                audit.evidence(sid, "cross_validation",
+                               f"{pass_count}/{len(verdicts)} verifiers PASS", "orchestrator",
+                               "orchestrator", cfg=cfg)
+            return out
+
+    # (2b) Single independent LLM cross-verifier (default path): producer ≠ verifier.
+    #     cfg.verifier(exclude=) enforces the invariant in the role layer; None → no verifier.
     verifier = cfg.verifier(exclude=executor)
     if verifier and not avail.get(verifier):
         # declared verifier is not on PATH → try any other available agent
@@ -428,7 +484,9 @@ def decide_node(s: S, cfg: Config) -> dict:
         dead_rationale = s.get("kill_reason") or s.get("block_reason") or t(cat, "graph.aborted")
         audit.decision(sid, "ABORTED: " + dead_rationale, 0.0, [], [], False, cfg=cfg)
         return {"decision": {"confidence": 0.0, "human_required": True, "rationale": dead_rationale}}
-    n_cross = 1 if s.get("verify_ok") else 0
+    # parallel_verify fan-out reports how many independent verifiers actually said PASS
+    # (0..len(fanout)); the default single-verifier path stays the old binary 0/1.
+    n_cross = s["verify_pass_count"] if "verify_pass_count" in s else (1 if s.get("verify_ok") else 0)
     prov_ok = _distinct_providers_ok(s)
     dec = decide(
         risk=s.get("risk", "internal"),
@@ -456,6 +514,14 @@ def decide_node(s: S, cfg: Config) -> dict:
         human_required = True
         rationale = (rationale + " | " if rationale else "") + \
             t(cat, "graph.decision_destructive")
+    # parallel_verify: independent verifiers split PASS/FAIL. This is NOT auto-resolved by
+    # majority (Article 7: evidence, not a vote) — a genuinely contested verdict is presented
+    # to a human, the same immutable override as a destructive command; a high confidence
+    # score cannot bypass it.
+    if s.get("verify_disagreement"):
+        human_required = True
+        rationale = (rationale + " | " if rationale else "") + \
+            t(cat, "graph.verify_disagreement_escalation")
     audit.decision(sid, (s.get("execution") or "")[:1000], dec.confidence,
                    list(s.get("evidence", [])), list(s.get("dissents", [])),
                    human_approved=False, cfg=cfg)
