@@ -20,7 +20,7 @@ from typing import Annotated, Any, TypedDict
 
 from langgraph.graph import END, START, StateGraph
 
-from . import audit, prompts
+from . import audit, learn, prompts
 from .config import (
     ROLE_CRITIC,
     ROLE_DISTILLER,
@@ -58,6 +58,7 @@ class S(TypedDict, total=False):
     verify_retries: int
     verify_pass_count: int       # parallel_verify: how many fanned-out verifiers said PASS
     verify_disagreement: bool    # parallel_verify: fanned-out verifiers split PASS/FAIL — not auto-resolved
+    repo_lessons: str            # learn_from_repo: excerpt read from the target repo's lessons file
     decision: dict
     report: str
     t_start: float
@@ -176,6 +177,13 @@ def preflight(s: S, cfg: Config) -> dict:
     }
     audit.message(sid, "orchestrator", "preflight",
                   {"risk": gw.risk, "providers": avail, "blocked": gw.blocked}, cfg=cfg)
+    if cfg.learn_from_repo:
+        # Read-only: an excerpt of the target repo's OWN lessons file (whatever
+        # convention it already uses), fed into PLAN so a documented mistake is not
+        # blindly repeated. Never raises, never writes (see council/learn.py).
+        lessons = learn.discover_lessons(cfg.council_home)
+        if lessons:
+            out["repo_lessons"] = lessons
     if gw.blocked:
         out.update(blocked=True, block_reason=gw.block_reason, killed=True, kill_reason=gw.block_reason)
         audit.incident(sid, "gateway_block", gw.block_reason, cfg=cfg)
@@ -205,7 +213,8 @@ def plan(s: S, cfg: Config) -> dict:
         # No declared leads available → fall back to any available enabled agent so a
         # minimal/advisory roster still produces a plan instead of silently doing nothing.
         leads = [a.name for a in cfg.agents if a.enabled and avail.get(a.name)]
-    prompt_text = prompts.prompt("plan", cat, task=s["task"])
+    repo_lessons = t(cat, "learn.prompt_prefix", lessons=s["repo_lessons"]) if s.get("repo_lessons") else ""
+    prompt_text = prompts.prompt("plan", cat, task=s["task"], repo_lessons=repo_lessons)
 
     # Fan the provider subprocesses out CONCURRENTLY when opted in (``parallel_plan``,
     # default OFF). Only the side-effect-free ``_invoke`` runs off-thread; every audit
@@ -584,6 +593,24 @@ def memory(s: S, cfg: Config) -> dict:
     status = "aborted" if _dead(s) else "done"
     if sid:
         audit.end_session(sid, status, round(s.get("calls", 0) * 0.01, 2), cfg=cfg)
+    # learn_from_repo (opt-in, default OFF): only a genuinely escalated run is
+    # lesson-worthy (Article 7) — a routine autonomous completion writes nothing, so
+    # the file stays a curated record instead of a log of everything konsey ever did.
+    dec = s.get("decision") or {}
+    if cfg.learn_from_repo and not _dead(s) and dec.get("human_required"):
+        cat = load_catalog(cfg)
+        # verify_disagreement / exec_needs_human are structural, reusable-elsewhere
+        # patterns (worth a "global candidate" flag); a plain risk-classification
+        # escalation is repo/task-specific.
+        global_candidate = bool(s.get("verify_disagreement") or s.get("exec_needs_human"))
+        learn.record_lesson(
+            cfg.council_home,
+            task=s.get("task", ""),
+            rationale=dec.get("rationale", ""),
+            confidence=dec.get("confidence", 0.0),
+            global_candidate=global_candidate,
+            catalog=cat,
+        )
     return {}
 
 
