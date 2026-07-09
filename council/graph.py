@@ -85,7 +85,7 @@ def _killcheck(s: S, cfg: Config) -> dict:
     return {}
 
 
-def _invoke(cfg: Config, agent: str, prompt_text: str, timeout: int = 180):
+def _invoke(cfg: Config, agent: str, prompt_text: str, timeout: int | None = None):
     """Run ONE adapter subprocess and return its raw ``AgentResult`` — NO audit writes.
 
     This is the *pure, side-effect-free* half of an agent call: it touches no session
@@ -94,7 +94,12 @@ def _invoke(cfg: Config, agent: str, prompt_text: str, timeout: int = 180):
     subprocess (I/O-bound, GIL released), while every append-only audit write stays on
     the orchestrator thread via ``_record`` (single-writer DuckDB, Article 10/2.4).
     Adapter resolution goes through the vendor-neutral registry; a missing CLI degrades
-    to a tool failure rather than crashing the graph (Article 2.3)."""
+    to a tool failure rather than crashing the graph (Article 2.3).
+
+    ``timeout=None`` (the default, used by every call site today) lets the adapter fall
+    back to its own per-provider ``CLIProfile.default_timeout`` (claude=180s,
+    codex/google=240s). A hardcoded int here would shadow that profile default for
+    every provider — which is exactly the bug this signature previously had."""
     from .adapters import adapter_for  # lazy: keeps build(cfg) importable before adapters lands
 
     return adapter_for(cfg, agent).run(prompt_text, timeout=timeout)
@@ -122,7 +127,7 @@ def _record(s: S, cfg: Config, agent: str, r, mtype: str) -> tuple[str, dict]:
                                        "evidence": [ev], "_ok": r.ok}
 
 
-def _ask(s: S, cfg: Config, agent: str, prompt_text: str, mtype: str, timeout: int = 180) -> tuple[str, dict]:
+def _ask(s: S, cfg: Config, agent: str, prompt_text: str, mtype: str, timeout: int | None = None) -> tuple[str, dict]:
     """Serial convenience: invoke one adapter and record it (the non-fan-out call path
     used by CRITIQUE / SYNTHESIZE / EXECUTE / VERIFY)."""
     return _record(s, cfg, agent, _invoke(cfg, agent, prompt_text, timeout=timeout), mtype)
