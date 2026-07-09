@@ -23,6 +23,7 @@ command *shapes*, not brand or path names. An operator can tighten via the optio
 from __future__ import annotations
 
 import re
+import sys
 
 # --------------------------------------------------------------------------- #
 # 6.2.2 — destructive / privileged command shapes (HARD FLOOR, never loosened).
@@ -149,11 +150,24 @@ def classify_command(
 # lazily (gateway may be a stub in some assembly orders) and never keep a second
 # copy of the signatures here.
 # --------------------------------------------------------------------------- #
+_warned_no_gateway = False
+
+
 def _secret_patterns() -> dict[str, "re.Pattern[str]"]:
+    global _warned_no_gateway
     try:
         from .gateway import SECRET_PATTERNS  # type: ignore[attr-defined]
         return dict(SECRET_PATTERNS)
-    except Exception:
+    except Exception as exc:
+        # redact_secrets() must never raise (6.2.5 sits on the hot path for every
+        # evidence write), but a silent {} here means ZERO redaction happens with no
+        # trace — a secret could reach the audit log or a prompt undetected. No
+        # session/cfg is available at this call depth to route through audit.incident,
+        # so surface it loudly on stderr once per process instead of swallowing it.
+        if not _warned_no_gateway:
+            _warned_no_gateway = True
+            print(f"[exec_policy] WARNING: gateway.SECRET_PATTERNS unavailable ({exc!r}) "
+                  "— redact_secrets() is a no-op until this is fixed.", file=sys.stderr)
         return {}
 
 
