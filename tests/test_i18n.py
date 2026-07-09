@@ -118,8 +118,8 @@ def test_t_prefers_catalog_then_canonical_then_key():
 def test_prompt_resolves_from_catalog_en_and_tr():
     en = i18n.load_catalog("en")
     tr = i18n.load_catalog("tr")
-    assert prompts.prompt("plan", en, task="DEMO").startswith("Task: DEMO")
-    assert prompts.prompt("plan", tr, task="DEMO").startswith("Görev: DEMO")
+    assert prompts.prompt("plan", en, task="DEMO", repo_lessons="").startswith("Task: DEMO")
+    assert prompts.prompt("plan", tr, task="DEMO", repo_lessons="").startswith("Görev: DEMO")
 
 
 def test_prompt_falls_back_to_canonical_with_no_catalog():
@@ -130,7 +130,7 @@ def test_prompt_falls_back_to_canonical_with_no_catalog():
 
 def test_all_state_prompts_fill_their_slots():
     slots = {
-        "plan": {"task": "T"},
+        "plan": {"task": "T", "repo_lessons": ""},
         "critique": {"task": "T", "plans": "P"},
         "synthesize": {"task": "T", "plans": "P", "critique": "C"},
         "execute": {"task": "T", "joint_plan": "J", "prior_failure": ""},

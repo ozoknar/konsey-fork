@@ -12,6 +12,26 @@ unverified "it works" claims. Test evidence is cited where it backs an entry.
 
 ### Added
 
+- **Opt-in repo-scoped self-improvement loop (`learn_from_repo`, default OFF;
+  `council/learn.py`).** MEMORY previously did nothing but close the audit session —
+  no lesson was ever extracted or fed back into a future run. When enabled: PREFLIGHT
+  reads the target repo's OWN existing lessons file (whichever convention it already
+  uses — `.prometheus/LESSONS.md` is the dominant one observed across real repos, with
+  `LESSONS.md` / `KONSEY_LESSONS.md` / a `lrn/` directory of dated files as fallbacks)
+  and injects an excerpt into the PLAN prompt so a documented mistake is not blindly
+  repeated; MEMORY appends ONE new dated entry back to `.prometheus/LESSONS.md`
+  (creating it with a locale-appropriate header if missing) — but ONLY when the run's
+  decision has `human_required=True` (Article 7: a routine autonomous completion is not
+  lesson-worthy, so the file stays a curated record, not a log of everything konsey
+  ever did). `verify_disagreement` / `exec_needs_human` are tagged as "global candidate"
+  (structural, reusable-elsewhere patterns) vs. a plain risk-classification escalation.
+  Read is pure (never creates/modifies anything); write never raises on a failed I/O
+  (Md.2.7 graceful degradation). Evidence: `tests/test_learn.py` (discovery precedence
+  and fallback chain, tail-truncation, header creation, locale labels, no-raise on
+  unwritable path), `tests/test_graph_orchestration.py`
+  (`test_learn_from_repo_*` — off-by-default, read reaches the PLAN prompt, gated
+  correctly on the OFF flag, write triggers only on human_required, no write on a
+  routine PASS).
 - **Opt-in concurrent PLAN fan-out (`parallel_plan`, default OFF).** When enabled, the
   PLAN node runs each lead provider's subprocess *concurrently* instead of one-after-another
   (wall-clock ≈ slowest provider, not the sum). Only the side-effect-free adapter

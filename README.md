@@ -149,6 +149,10 @@ parallel_verify = false     # opt-in: fan VERIFY out to every non-executor agent
                             #   a split PASS/FAIL verdict escalates to a human, never voted (Art. 7)
 verify_cmd = ""             # opt-in: a real acceptance command at VERIFY; its exit code
                             #   is authoritative over the LLM verdict (gate-test ≠ real-test)
+learn_from_repo = false     # opt-in: read the target repo's own lessons file into PLAN
+                            #   (.prometheus/LESSONS.md / LESSONS.md / KONSEY_LESSONS.md / lrn/,
+                            #   whichever it already uses), write a new dated entry only
+                            #   when a run escalates to a human — default OFF
 
 [[agents]]                  # generic role → provider; producer is never its sole verifier
 name = "claude"

@@ -153,6 +153,10 @@ parallel_verify = false     # opt-in: VERIFY'yi yürütücü-dışı her ajana f
                             #   KAPALI); bölünmüş PASS/FAIL kararı oylanmaz, insana taşınır (Md.7)
 verify_cmd = ""             # opt-in: VERIFY'de gerçek kabul komutu; exit-code'u LLM
                             #   kararından üstündür (gate-test ≠ real-test)
+learn_from_repo = false     # opt-in: hedef repo'nun kendi öğrenme dosyasını PLAN'a oku
+                            #   (.prometheus/LESSONS.md / LESSONS.md / KONSEY_LESSONS.md / lrn/,
+                            #   hangisi kullanılıyorsa), sadece insana taşınan run'lardan
+                            #   sonra yeni tarihli bir kayıt ekle — varsayılan KAPALI
 
 [[agents]]                  # jenerik rol → sağlayıcı; üreten asla tek doğrulayıcı değil
 name = "claude"

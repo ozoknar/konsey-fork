@@ -235,3 +235,67 @@ def test_parallel_verify_all_fail_still_retries_then_decides(tmp_path, monkeypat
     assert final.get("verify_ok") is False
     assert final.get("verify_retries", 0) >= cfg.max_verify_retries
     assert "confidence" in final.get("decision", {})
+
+
+# --------------------------------------------------------------------------- #
+# learn_from_repo — read the target repo's lessons into PLAN, write a new one  #
+# on a human-required run (opt-in, default OFF; council/learn.py)              #
+# --------------------------------------------------------------------------- #
+
+def test_learn_from_repo_off_by_default(tmp_path):
+    assert _cfg(tmp_path, _FULL_ROSTER).learn_from_repo is False
+
+
+def test_learn_from_repo_reads_lessons_into_plan_prompt(tmp_path, monkeypatch):
+    (tmp_path / ".prometheus").mkdir()
+    (tmp_path / ".prometheus" / "LESSONS.md").write_text(
+        "- 2026-01-01, past mistake: do not delete the staging bucket directly.\n",
+        encoding="utf-8")
+    cfg = _cfg(tmp_path, _FULL_ROSTER, learn_from_repo=True)
+    calls: list[str] = []
+    verify_count = [0]
+    monkeypatch.setattr(graph, "available", lambda cfg: {n: True for n in ["claude", "codex", "google"]})
+    monkeypatch.setattr("council.adapters.adapter_for",
+                        lambda cfg, name: _RecordingAdapter(calls, verify_count, fail_first_verify=False))
+    _run(cfg)
+    plan_prompts = [c for c in calls if c.startswith("Task: tidy the docs")]
+    assert plan_prompts, "expected at least one PLAN call"
+    assert any("do not delete the staging bucket directly" in p for p in plan_prompts)
+
+
+def test_learn_from_repo_does_not_read_when_off(tmp_path, monkeypatch):
+    (tmp_path / ".prometheus").mkdir()
+    (tmp_path / ".prometheus" / "LESSONS.md").write_text(
+        "- 2026-01-01, past mistake: should never appear in the prompt.\n", encoding="utf-8")
+    cfg = _cfg(tmp_path, _FULL_ROSTER)   # learn_from_repo defaults False
+    calls: list[str] = []
+    verify_count = [0]
+    monkeypatch.setattr(graph, "available", lambda cfg: {n: True for n in ["claude", "codex", "google"]})
+    monkeypatch.setattr("council.adapters.adapter_for",
+                        lambda cfg, name: _RecordingAdapter(calls, verify_count, fail_first_verify=False))
+    _run(cfg)
+    assert not any("should never appear in the prompt" in c for c in calls)
+
+
+def test_learn_from_repo_writes_lesson_when_human_required(tmp_path, monkeypatch):
+    # A destructive-shaped EXECUTE output forces exec_needs_human -> decision.human_required,
+    # regardless of confidence — the trigger memory() gates the write on.
+    cfg = _cfg(tmp_path, _FULL_ROSTER, learn_from_repo=True)
+    _install(monkeypatch, ["claude", "codex", "google"], "sure, run: rm -rf /var/data")
+    final = _run(cfg)
+    assert final["decision"]["human_required"] is True
+    lessons_path = tmp_path / ".prometheus" / "LESSONS.md"
+    assert lessons_path.is_file()
+    text = lessons_path.read_text(encoding="utf-8")
+    assert "tidy the docs" in text
+    assert "Global candidate: yes" in text   # exec_needs_human is a structural trigger
+
+
+def test_learn_from_repo_does_not_write_on_routine_completion(tmp_path, monkeypatch):
+    # A clean PASS with internal risk completes autonomously (human_required=False) —
+    # not lesson-worthy; the file must not even be created.
+    cfg = _cfg(tmp_path, _FULL_ROSTER, learn_from_repo=True)
+    _install(monkeypatch, ["claude", "codex", "google"], "PASS — looks correct\n(stub output)")
+    final = _run(cfg)
+    assert final["decision"]["human_required"] is False
+    assert not (tmp_path / ".prometheus" / "LESSONS.md").exists()
