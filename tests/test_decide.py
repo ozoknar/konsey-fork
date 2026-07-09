@@ -110,6 +110,36 @@ def test_custom_thresholds_are_honoured_if_supported():
     assert decide(**noxval_pii, confidence_floor=0.5).human_required is False
 
 
+def test_scoring_weights_default_to_the_old_hardcoded_values():
+    # The weights used to be literals inside decide() (0.45/0.15/0.05/0.10/0.10/0.15).
+    # Moving them to overridable parameters must not change a single default result.
+    from council.config import (
+        DECIDE_BASE_SCORE, DECIDE_CONSENSUS_BONUS, DECIDE_CROSSVERIFY_WEIGHT,
+        DECIDE_DISSENT_PENALTY, DECIDE_EVIDENCE_WEIGHT, DECIDE_TOOL_FAILURE_PENALTY,
+    )
+    assert (DECIDE_BASE_SCORE, DECIDE_CROSSVERIFY_WEIGHT, DECIDE_EVIDENCE_WEIGHT,
+            DECIDE_CONSENSUS_BONUS, DECIDE_DISSENT_PENALTY, DECIDE_TOOL_FAILURE_PENALTY) == (
+        0.45, 0.15, 0.05, 0.10, 0.10, 0.15)
+    # 0.45 base + 3*0.15 xval + 3*0.05 evidence + 0.10 consensus = 1.00, matches pre-refactor math.
+    assert _call(**_STRONG).confidence == 1.0
+
+
+def test_scoring_weights_are_tunable_per_instance():
+    sig = inspect.signature(decide)
+    if "crossverify_weight" not in sig.parameters:
+        pytest.skip("decide does not expose overridable scoring weights")
+    # Weighing cross-verification more heavily must raise confidence for the same evidence
+    # (an operator use case: emphasise external verification over consensus/volume).
+    one_xval = {**_NOXVAL, "n_crossverified": 1}
+    default_conf = _call(**one_xval).confidence
+    heavier_conf = decide(**one_xval, crossverify_weight=0.30).confidence
+    assert heavier_conf > default_conf
+    # Zeroing every additive weight collapses confidence to exactly base_score.
+    zeroed = decide(**_STRONG, crossverify_weight=0.0, evidence_weight=0.0,
+                    consensus_bonus=0.0, base_score=0.20).confidence
+    assert zeroed == 0.20
+
+
 def test_decision_carries_a_rationale():
     d = _call(**_NOXVAL)
     assert getattr(d, "rationale", "")  # decisions are explainable, not opaque

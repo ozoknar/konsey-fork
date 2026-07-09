@@ -440,6 +440,12 @@ def decide_node(s: S, cfg: Config) -> dict:
         tool_failures=s.get("tool_failures", 0),
         confidence_floor=cfg.confidence_floor,
         confidence_cap_noxval=cfg.confidence_cap_noxval,
+        base_score=cfg.decide_base_score,
+        crossverify_weight=cfg.decide_crossverify_weight,
+        evidence_weight=cfg.decide_evidence_weight,
+        consensus_bonus=cfg.decide_consensus_bonus,
+        dissent_penalty=cfg.decide_dissent_penalty,
+        tool_failure_penalty=cfg.decide_tool_failure_penalty,
         catalog=cat,
     )
     # Article 6.2.2: a destructive command in the output can never auto-run — force the

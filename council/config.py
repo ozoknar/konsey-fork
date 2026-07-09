@@ -25,6 +25,17 @@ KILL_TOOL_FAILURES = 3          # consecutive tool-failure streak → kill switc
 CONFIDENCE_FLOOR = 0.7          # below this, decision escalates to a human (Md.7.3)
 CONFIDENCE_CAP_NOXVAL = 0.6     # no cross-verification → confidence ceiling (Md.7.2, advisory)
 
+# --- decide() scoring weights (Article 7) — evidence-weighted, NOT a vote. Previously
+# hardcoded literals inside decide.py; moved here so an operator can tune emphasis
+# (e.g. weigh cross-verification more heavily) without editing core. Defaults are
+# byte-identical to the pre-existing hardcoded values — this is a pure refactor. ---
+DECIDE_BASE_SCORE = 0.45              # starting score before any evidence is applied
+DECIDE_CROSSVERIFY_WEIGHT = 0.15      # per cross-verified outcome, capped at 3 (primary weight)
+DECIDE_EVIDENCE_WEIGHT = 0.05         # per evidence item, capped at 3 (secondary weight)
+DECIDE_CONSENSUS_BONUS = 0.10         # agreement AND >=2 providers (signal only, small)
+DECIDE_DISSENT_PENALTY = 0.10         # per unresolved dissent
+DECIDE_TOOL_FAILURE_PENALTY = 0.15    # per tool failure
+
 # --- Role names are generic and provider-independent (Constitution Article 3). ---
 ROLE_LEAD = "lead"
 ROLE_CRITIC = "critic"
@@ -114,6 +125,12 @@ class Config:
     kill_tool_failures: int = KILL_TOOL_FAILURES
     confidence_floor: float = CONFIDENCE_FLOOR
     confidence_cap_noxval: float = CONFIDENCE_CAP_NOXVAL
+    decide_base_score: float = DECIDE_BASE_SCORE
+    decide_crossverify_weight: float = DECIDE_CROSSVERIFY_WEIGHT
+    decide_evidence_weight: float = DECIDE_EVIDENCE_WEIGHT
+    decide_consensus_bonus: float = DECIDE_CONSENSUS_BONUS
+    decide_dissent_penalty: float = DECIDE_DISSENT_PENALTY
+    decide_tool_failure_penalty: float = DECIDE_TOOL_FAILURE_PENALTY
 
     # ----- roster resolution (kills the hard-coded ("claude","codex","google")) -----
 
@@ -258,6 +275,12 @@ def load_config(path: str | os.PathLike[str] | None = None) -> Config:
         kill_tool_failures=int(data.get("kill_tool_failures", base.kill_tool_failures)),
         confidence_floor=float(data.get("confidence_floor", base.confidence_floor)),
         confidence_cap_noxval=float(data.get("confidence_cap_noxval", base.confidence_cap_noxval)),
+        decide_base_score=float(data.get("decide_base_score", base.decide_base_score)),
+        decide_crossverify_weight=float(data.get("decide_crossverify_weight", base.decide_crossverify_weight)),
+        decide_evidence_weight=float(data.get("decide_evidence_weight", base.decide_evidence_weight)),
+        decide_consensus_bonus=float(data.get("decide_consensus_bonus", base.decide_consensus_bonus)),
+        decide_dissent_penalty=float(data.get("decide_dissent_penalty", base.decide_dissent_penalty)),
+        decide_tool_failure_penalty=float(data.get("decide_tool_failure_penalty", base.decide_tool_failure_penalty)),
     )
 
 
