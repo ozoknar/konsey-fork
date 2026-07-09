@@ -107,6 +107,25 @@
   that target is identified; do not add `CLAUDE_CONFIG_DIR`/`HOME` isolation for claude
   without also solving credential re-seed, or it will silently break the quorum exactly like
   an un-re-seeded codex/google node would.
+- **`council/a2a/` — A2A deliberately deferred, ACP considered and also deferred (2026-07
+  evidence-based review).** The stub (`__init__.py`/`client.py`/`server.py`, ~5 lines of real
+  content) predates this review with a bare "TODO Phase 3". Evidence gathered: Google's A2A
+  (Agent2Agent, Linux Foundation, v1.0 as of ~Apr 2026) is built for networked, cross-org
+  remote-agent delegation (HTTP/gRPC/JSON-RPC, "Agent Card" discovery, OAuth2/OIDC/mTLS) —
+  konsey orchestrates 3 LOCAL CLI subprocesses on one machine, so there is no remote service
+  to discover/authenticate to; implementing A2A would solve a problem konsey does not have.
+  The closer conceptual fit is the Agent Client Protocol (ACP, Zed Industries + JetBrains,
+  JSON-RPC/stdio, explicitly a client-drives-agent-CLI model) — Codex CLI and Gemini CLI both
+  ship official ACP-agent support, but Claude Code has NO native outbound ACP client
+  (`anthropics/claude-code#6686` closed NOT_PLANNED despite ~439 upvotes); the only practical
+  bridge is a third-party headless client (`acpx`, MIT-licensed) that is **alpha-stage**.
+  Decision: do not implement A2A (wrong layer); do not adopt ACP/acpx yet either — making it
+  the core call mechanism for the codex/agy nodes would swap a working (if unstructured)
+  subprocess call for an unproven dependency in the critical reasoning path, the same class
+  of risk this review already declined once for claude's own isolation (above). The stub
+  docstrings now record this reasoning in place of the old TODO so the deferral reads as a
+  decision, not an abandoned placeholder. Revisit when acpx matures out of alpha or Claude
+  Code ships a native ACP client.
 - **Art. 6.2 EXECUTE sandbox not yet enforced.** `exec_sandbox` exists in `Config` but is
   not wired into an execution path, because this MVP's orchestrator only invokes **provider
   CLIs** (claude/codex/agy) — it does not run arbitrary shell extracted from model output.
