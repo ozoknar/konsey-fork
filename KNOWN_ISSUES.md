@@ -63,7 +63,9 @@
   `council/isolation.py` + a non-fatal ⚠ in `council doctor` + an install-time list in
   `council init`, plus the Art. 2.6 doctrine. **Shipped (PR2):** *enforcement* — the
   isolation argv/env is now INJECTED in `adapters.py:GenericCLIAdapter._argv`/`_env`
-  (claude `--strict-mcp-config --setting-sources none`; codex `--ignore-user-config`
+  (claude `--strict-mcp-config --setting-sources ""` — the EMPTY string, not the literal
+  `none`, which the CLI rejects as an invalid value and errors out on (found by a live run,
+  the gate-test≠real-test catch); codex `--ignore-user-config`
   + `-c project_doc_max_bytes=0` + isolated `CODEX_HOME`/`-C`; google/agy HOME-only, as
   it has no native config-suppression flag), default-ON with an explicit
   `unsafe_inherit_provider_config` opt-OUT. The flag injection is asserted by
@@ -85,6 +87,26 @@
   Verified by a live `konsey run` reaching `providers_ok == 3` (claude+codex+agy, no authfail)
   and by `tests/test_adapters_isolation.py` (seed restores creds, curates leaks, no-ops on a
   missing source).
+- **claude node has NO env-level isolation (argv-only) — investigated, deliberately not
+  shipped, not silently missing.** Unlike codex/google, the claude node relies solely on
+  `--strict-mcp-config --setting-sources ""`; `_env()` does not redirect `$HOME` or set
+  `CLAUDE_CONFIG_DIR` for it, so `~/.claude.json`/MCP config are reachable by *path* even
+  though `--setting-sources ""` should prevent them being *loaded* (this is exactly the class
+  of gap the 2026-04 Claude Code CVE chain — env/settings.json → shell injection → credential
+  exfiltration — describes). Investigated adding `CLAUDE_CONFIG_DIR=<isolated temp dir>`
+  to mirror codex's `CODEX_HOME` pattern; **empirically this breaks auth for the common
+  Keychain-OAuth login case** (`CLAUDE_CONFIG_DIR` pointed at a fresh dir → `claude -p`
+  reports "Not logged in", live-tested — real `$HOME`/`Library/Keychains` untouched, so
+  login state is gated by something *inside* the config dir, not pure OS Keychain lookup).
+  Headless mode does honor `ANTHROPIC_API_KEY`/`ANTHROPIC_AUTH_TOKEN` over Keychain when
+  present, so `CLAUDE_CONFIG_DIR` isolation is safe ONLY when one of those is set — but
+  gating on that would silently drop the far more common subscription/Keychain-login node
+  out of the quorum, the exact failure class Credential re-seed (above) exists to prevent.
+  No file-copyable credential-linkage target (an `auth.json`/`oauth_creds.json` equivalent)
+  is confirmed for claude, so there is nothing safe to re-seed yet. Left as argv-only until
+  that target is identified; do not add `CLAUDE_CONFIG_DIR`/`HOME` isolation for claude
+  without also solving credential re-seed, or it will silently break the quorum exactly like
+  an un-re-seeded codex/google node would.
 - **Art. 6.2 EXECUTE sandbox not yet enforced.** `exec_sandbox` exists in `Config` but is
   not wired into an execution path, because this MVP's orchestrator only invokes **provider
   CLIs** (claude/codex/agy) — it does not run arbitrary shell extracted from model output.
