@@ -20,6 +20,12 @@ from .i18n import t
 # them from Config so a single instance can be tuned without editing core.
 DEFAULT_CONFIDENCE_FLOOR = 0.7
 DEFAULT_CONFIDENCE_CAP_NOXVAL = 0.6
+DEFAULT_BASE_SCORE = 0.45
+DEFAULT_CROSSVERIFY_WEIGHT = 0.15
+DEFAULT_EVIDENCE_WEIGHT = 0.05
+DEFAULT_CONSENSUS_BONUS = 0.10
+DEFAULT_DISSENT_PENALTY = 0.10
+DEFAULT_TOOL_FAILURE_PENALTY = 0.15
 
 
 @dataclass
@@ -40,6 +46,12 @@ def decide(
     tool_failures: int,
     confidence_floor: float = DEFAULT_CONFIDENCE_FLOOR,
     confidence_cap_noxval: float = DEFAULT_CONFIDENCE_CAP_NOXVAL,
+    base_score: float = DEFAULT_BASE_SCORE,
+    crossverify_weight: float = DEFAULT_CROSSVERIFY_WEIGHT,
+    evidence_weight: float = DEFAULT_EVIDENCE_WEIGHT,
+    consensus_bonus: float = DEFAULT_CONSENSUS_BONUS,
+    dissent_penalty: float = DEFAULT_DISSENT_PENALTY,
+    tool_failure_penalty: float = DEFAULT_TOOL_FAILURE_PENALTY,
     catalog: Mapping[str, str] | None = None,
 ) -> Decision:
     """Score a decision on evidence, not on a majority vote (Article 7).
@@ -54,14 +66,17 @@ def decide(
         tool_failures: count of tool failures.
         confidence_floor: below this, escalate to a human (Article 7.3 / 6.7).
         confidence_cap_noxval: ceiling when there is no cross-verification (Article 7.2, advisory).
+        base_score, crossverify_weight, evidence_weight, consensus_bonus, dissent_penalty,
+        tool_failure_penalty: the scoring weights themselves — previously hardcoded, now
+        tunable per-instance (defaults are byte-identical to the old hardcoded values).
     """
-    score = 0.45
-    score += min(n_crossverified, 3) * 0.15      # primary weight: external verification
-    score += min(n_evidence, 3) * 0.05           # evidence volume (secondary)
+    score = base_score
+    score += min(n_crossverified, 3) * crossverify_weight   # primary weight: external verification
+    score += min(n_evidence, 3) * evidence_weight            # evidence volume (secondary)
     if agreement and n_providers_ok >= 2:
-        score += 0.10                            # consensus is only a small bonus (signal)
-    score -= unresolved_dissent * 0.10
-    score -= tool_failures * 0.15
+        score += consensus_bonus                             # consensus is only a small bonus (signal)
+    score -= unresolved_dissent * dissent_penalty
+    score -= tool_failures * tool_failure_penalty
     if n_crossverified == 0:
         # No external verification → cap below the human-escalation floor. A single
         # provider (advisory mode) can never clear the bar on its own (Article 7.2).
