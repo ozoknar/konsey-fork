@@ -235,6 +235,7 @@
   "graph.advisory_reason": "only {n} provider(s) — cross-verification disabled, confidence capped at {cap} (advisory mode)",
   "graph.decision_destructive": "destructive/privileged command in output — human approval required (Article 6.2.2)",
   "graph.incident_destructive": "agent output contains a destructive/privileged command shape (Article 6.2.2) — human approval required before execution",
+  "graph.verify_disagreement_escalation": "independent verifiers disagreed (split PASS/FAIL) — not auto-resolved, human approval required (Article 7)",
   "graph.kill_tool_failures": "{n} consecutive tool failures (Art.9.1)",
   "graph.kill_wall_time": "wall-time exceeded ({elapsed}s > {max_wall}s)",
   "graph.verify_advisory_reason": "no independent verifier — output marked unverified",

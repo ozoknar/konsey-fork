@@ -235,6 +235,7 @@
   "graph.advisory_reason": "yalnızca {n} sağlayıcı — çapraz-doğrulama kapalı, güven tavanı {cap} (danışman modu)",
   "graph.decision_destructive": "çıktıda yıkıcı/ayrıcalıklı komut — insan onayı gerekli (Madde 6.2.2)",
   "graph.incident_destructive": "ajan çıktısı yıkıcı/ayrıcalıklı bir komut biçimi içeriyor (Madde 6.2.2) — çalıştırmadan önce insan onayı gerekli",
+  "graph.verify_disagreement_escalation": "bağımsız doğrulayıcılar anlaşamadı (PASS/FAIL bölündü) — otomatik çözülmez, insan onayı gerekli (Madde 7)",
   "graph.kill_tool_failures": "{n} ardışık araç hatası (Md.9.1)",
   "graph.kill_wall_time": "duvar-saati aşıldı ({elapsed}s > {max_wall}s)",
   "graph.verify_advisory_reason": "bağımsız doğrulayıcı yok — çıktı doğrulanmamış damgalı",

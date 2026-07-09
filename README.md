@@ -145,6 +145,8 @@ data_regime = "standard"    # standard | kvkk | gdpr | hipaa
 exec_sandbox = "off"        # off | read-only | workspace-write
 autocapture_enabled = false # opt-in; default OFF
 parallel_plan = false       # opt-in: run the PLAN providers concurrently (default OFF)
+parallel_verify = false     # opt-in: fan VERIFY out to every non-executor agent (default OFF);
+                            #   a split PASS/FAIL verdict escalates to a human, never voted (Art. 7)
 verify_cmd = ""             # opt-in: a real acceptance command at VERIFY; its exit code
                             #   is authoritative over the LLM verdict (gate-test ≠ real-test)
 

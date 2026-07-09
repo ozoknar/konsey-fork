@@ -149,6 +149,8 @@ data_regime = "standard"    # standard | kvkk | gdpr | hipaa
 exec_sandbox = "off"        # off | read-only | workspace-write
 autocapture_enabled = false # opt-in; varsayılan KAPALI
 parallel_plan = false       # opt-in: PLAN sağlayıcıları eşzamanlı koş (varsayılan KAPALI)
+parallel_verify = false     # opt-in: VERIFY'yi yürütücü-dışı her ajana fan-out et (varsayılan
+                            #   KAPALI); bölünmüş PASS/FAIL kararı oylanmaz, insana taşınır (Md.7)
 verify_cmd = ""             # opt-in: VERIFY'de gerçek kabul komutu; exit-code'u LLM
                             #   kararından üstündür (gate-test ≠ real-test)
 

@@ -117,6 +117,8 @@ class Config:
     unsafe_inherit_provider_config: bool = False # opt-in: do not isolate node subprocess environment (PR2)
     parallel_plan: bool = False             # opt-in: fan the PLAN providers out concurrently (default OFF, Md.3)
     parallel_plan_max: int = 4              # concurrency cap for the PLAN fan-out (bounded resource use)
+    parallel_verify: bool = False           # opt-in: fan VERIFY out to every non-executor agent (default OFF)
+    parallel_verify_max: int = 4            # concurrency cap for the VERIFY fan-out (bounded resource use)
     verify_cmd: str = ""                    # opt-in: real acceptance command run at VERIFY (exit-code > LLM, Md.2.1/2.7)
     extra_path: str = field(default_factory=_default_extra_path)
     budgets: dict[str, dict[str, Any]] = field(default_factory=dict)
@@ -268,6 +270,8 @@ def load_config(path: str | os.PathLike[str] | None = None) -> Config:
         unsafe_inherit_provider_config=bool(data.get("unsafe_inherit_provider_config", base.unsafe_inherit_provider_config)),
         parallel_plan=bool(data.get("parallel_plan", base.parallel_plan)),
         parallel_plan_max=max(1, int(data.get("parallel_plan_max", base.parallel_plan_max))),
+        parallel_verify=bool(data.get("parallel_verify", base.parallel_verify)),
+        parallel_verify_max=max(1, int(data.get("parallel_verify_max", base.parallel_verify_max))),
         verify_cmd=str(data.get("verify_cmd", base.verify_cmd)) or base.verify_cmd,
         extra_path=str(data.get("extra_path", base.extra_path)) or base.extra_path,
         budgets=dict(data.get("budgets", base.budgets)),

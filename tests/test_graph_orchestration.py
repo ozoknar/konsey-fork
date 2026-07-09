@@ -36,8 +36,9 @@ class _Adapter:
         return _Result(self._reply)
 
 
-def _cfg(tmp_path, agents) -> Config:
-    return Config(council_home=tmp_path, data_home=tmp_path / "data", owner="op", agents=agents)
+def _cfg(tmp_path, agents, **overrides) -> Config:
+    return Config(council_home=tmp_path, data_home=tmp_path / "data", owner="op", agents=agents,
+                 **overrides)
 
 
 def _install(monkeypatch, names, reply) -> None:
@@ -162,3 +163,75 @@ def test_retry_execute_prompt_includes_prior_verify_failure(tmp_path, monkeypatc
     assert "the date is wrong" in execute_prompts[1]
     # And it must have actually recovered on retry (second verify call replies PASS).
     assert final.get("verify_ok") is True
+
+
+class _PerAgentAdapter:
+    """Replies based on which agent it's bound to (unlike ``_Adapter``'s single shared
+    reply) — needed to make different fanned-out verifiers disagree deterministically."""
+    def __init__(self, name: str, replies: dict[str, str]) -> None:
+        self._name = name
+        self._replies = replies
+
+    def run(self, prompt: str, timeout: int = 180) -> _Result:   # noqa: ARG002 (stub)
+        return _Result(self._replies.get(self._name, "stub output"))
+
+
+def _install_per_agent(monkeypatch, names, replies) -> None:
+    monkeypatch.setattr(graph, "available", lambda cfg: {n: True for n in names})
+    monkeypatch.setattr("council.adapters.adapter_for",
+                        lambda cfg, name: _PerAgentAdapter(name, replies))
+
+
+def test_parallel_verify_off_by_default(tmp_path):
+    assert _cfg(tmp_path, _FULL_ROSTER).parallel_verify is False
+
+
+def test_parallel_verify_all_agree_raises_crossverify_above_one(tmp_path, monkeypatch):
+    # Both non-executor agents (codex, google) independently PASS → verify_pass_count=2,
+    # which decide.py's min(n_crossverified,3)*weight formula can now actually use — the
+    # single-verifier path could never report more than 1.
+    cfg = _cfg(tmp_path, _FULL_ROSTER, parallel_verify=True)
+    _install_per_agent(monkeypatch, ["claude", "codex", "google"], {
+        "codex": "VERDICT: PASS\nchecks out",
+        "google": "VERDICT: PASS\nagreed",
+    })
+    final = _run(cfg)
+    assert final.get("verify_pass_count") == 2
+    assert final.get("verify_ok") is True
+    assert final.get("verify_disagreement") is False
+    assert final["decision"]["human_required"] is False
+
+
+def test_parallel_verify_disagreement_escalates_to_human(tmp_path, monkeypatch):
+    # codex says PASS, google says FAIL — a genuine split. Not auto-resolved by majority
+    # (Article 7: evidence, not a vote): forces human_required regardless of confidence,
+    # and both verdicts land in dissents.
+    cfg = _cfg(tmp_path, _FULL_ROSTER, parallel_verify=True)
+    _install_per_agent(monkeypatch, ["claude", "codex", "google"], {
+        "codex": "VERDICT: PASS\nlooks fine to me",
+        "google": "VERDICT: FAIL\nfound a real issue",
+    })
+    final = _run(cfg)
+    assert final.get("verify_disagreement") is True
+    assert final.get("verify_pass_count") == 1
+    assert final["decision"]["human_required"] is True, (
+        "a split verifier verdict must escalate to a human, not be silently vote-resolved"
+    )
+    dissent_agents = {d["agent"] for d in final.get("dissents", [])}
+    assert dissent_agents == {"codex", "google"}
+
+
+def test_parallel_verify_all_fail_still_retries_then_decides(tmp_path, monkeypatch):
+    # Unanimous FAIL is not a disagreement — behaves like the single-verifier FAIL path
+    # (bounded retry, then DECIDE), just with every non-executor agent's vote counted.
+    cfg = _cfg(tmp_path, _FULL_ROSTER, parallel_verify=True)
+    _install_per_agent(monkeypatch, ["claude", "codex", "google"], {
+        "codex": "VERDICT: FAIL\nnot convinced",
+        "google": "VERDICT: FAIL\nalso not convinced",
+    })
+    final = _run(cfg)
+    assert final.get("verify_disagreement") is False
+    assert final.get("verify_pass_count") == 0
+    assert final.get("verify_ok") is False
+    assert final.get("verify_retries", 0) >= cfg.max_verify_retries
+    assert "confidence" in final.get("decision", {})
