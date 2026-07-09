@@ -115,3 +115,50 @@ def test_failed_verification_retries_then_decides_bounded(tmp_path, monkeypatch)
     assert final.get("verify_ok") is False
     assert final.get("verify_retries", 0) >= cfg.max_verify_retries
     assert "confidence" in final.get("decision", {})
+
+
+class _RecordingAdapter:
+    """Records every prompt it receives; replies PASS/FAIL depending on whether the
+    prompt is a VERIFY call (detected by the verify template's fixed phrasing) so a
+    retry can be forced deterministically.
+
+    ``adapter_for`` is called fresh for every single ``_invoke`` (a new instance per
+    call, not a reused one) — so the verify counter MUST live in a shared mutable
+    object passed in from the test, not on ``self``, or every instance sees count=0
+    and "fails" forever."""
+    def __init__(self, calls: list[str], verify_count: list[int], fail_first_verify: bool) -> None:
+        self._calls = calls
+        self._verify_count = verify_count
+        self._fail_first_verify = fail_first_verify
+
+    def run(self, prompt: str, timeout: int = 180) -> _Result:   # noqa: ARG002 (stub)
+        self._calls.append(prompt)
+        if "Verify independently" in prompt:
+            self._verify_count[0] += 1
+            if self._fail_first_verify and self._verify_count[0] == 1:
+                return _Result("VERDICT: FAIL\nthe date is wrong")
+            return _Result("VERDICT: PASS\nlooks correct")
+        return _Result("stub output")
+
+
+def test_retry_execute_prompt_includes_prior_verify_failure(tmp_path, monkeypatch):
+    # Regression for the blind-retry bug: route_after_verify() re-enters EXECUTE after a
+    # FAIL, but execute() used to rebuild its prompt from task+joint_plan only — the
+    # retry had zero information about what failed and could repeat the same mistake.
+    cfg = _cfg(tmp_path, _FULL_ROSTER)
+    calls: list[str] = []
+    verify_count = [0]
+    monkeypatch.setattr(graph, "available", lambda cfg: {n: True for n in ["claude", "codex", "google"]})
+    monkeypatch.setattr("council.adapters.adapter_for",
+                        lambda cfg, name: _RecordingAdapter(calls, verify_count, fail_first_verify=True))
+    final = _run(cfg)
+
+    execute_prompts = [c for c in calls if "Produce the final output" in c]
+    assert len(execute_prompts) >= 2, "expected an initial EXECUTE call plus at least one retry"
+    # First attempt: no prior failure to report yet.
+    assert "FAILED independent verification" not in execute_prompts[0]
+    # Retry: the previous FAIL verdict must be embedded so the agent fixes the actual issue.
+    assert "FAILED independent verification" in execute_prompts[1]
+    assert "the date is wrong" in execute_prompts[1]
+    # And it must have actually recovered on retry (second verify call replies PASS).
+    assert final.get("verify_ok") is True

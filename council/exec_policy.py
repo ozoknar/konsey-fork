@@ -76,6 +76,23 @@ HARD_FLOOR_DENYLIST: dict[str, re.Pattern[str]] = {
         r"|\b(?:ssh-keygen|gpg\s+--(?:gen-key|delete-secret-key))\b",
         re.IGNORECASE,
     ),
+    # obfuscated / dynamically-constructed execution — a static regex denylist cannot
+    # see inside shell expansion, so these constructs hide a dangerous verb from every
+    # pattern above (GuardFall, arXiv 2026: 10/11 coding-agent command gates bypassed
+    # via $IFS splitting, command substitution, or decode-then-pipe-to-shell). We
+    # cannot safely decode/evaluate these ourselves without a real shell-aware
+    # tokenizer (out of scope here), so the conservative floor routes the *shape*
+    # itself to needs_human rather than trying to see through it.
+    "dynamic_exec": re.compile(
+        r"\$\{?IFS\}?"                                                  # $IFS / ${IFS} field-separator token-split
+        r"|`[^`]*\b(?:rm|sudo|dd|mkfs|chmod|chown|shred)\b[^`]*`"        # backtick command-sub wrapping a dangerous verb
+        r"|\$\([^)]*\b(?:rm|sudo|dd|mkfs|chmod|chown|shred)\b[^)]*\)"   # $(...) command-sub wrapping a dangerous verb
+        r"|\b(?:base64|xxd|openssl\s+(?:base64|enc))\b[^\n;|&]*"
+        r"(?:-d|--decode|-r)\b[^\n]*\|\s*(?:sh|bash|zsh|eval)\b"        # decode-then-pipe-to-shell
+        r"|\beval\b[^\n;|&]*\$\("                                       # eval wrapping a command substitution
+        r"|\b(?:curl|wget)\b[^\n;|&]*\|\s*(?:sudo\s+)?(?:sh|bash|zsh)\b",  # curl/wget piped straight into a shell
+        re.IGNORECASE,
+    ),
 }
 
 

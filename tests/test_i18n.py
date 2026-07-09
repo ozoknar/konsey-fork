@@ -133,7 +133,7 @@ def test_all_state_prompts_fill_their_slots():
         "plan": {"task": "T"},
         "critique": {"task": "T", "plans": "P"},
         "synthesize": {"task": "T", "plans": "P", "critique": "C"},
-        "execute": {"task": "T", "joint_plan": "J"},
+        "execute": {"task": "T", "joint_plan": "J", "prior_failure": ""},
         "verify": {"task": "T", "execution": "E"},
     }
     for locale in ("en", "tr"):

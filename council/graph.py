@@ -288,8 +288,18 @@ def execute(s: S, cfg: Config) -> dict:
     agent = _distiller(cfg, avail)
     if not agent:
         return {}
+    # route_after_verify() re-enters EXECUTE after a failed VERIFY (up to
+    # cfg.max_verify_retries). Without the prior verdict, a retry regenerates output
+    # from the same task+plan with zero information about what failed, and can repeat
+    # the same mistake until the retry cap is hit (blind-retry loop). Feed the previous
+    # verdict back in on any retry (verify_retries > 0) so the agent fixes the actual
+    # reported issue instead of guessing.
+    prior_failure = ""
+    if s.get("verify_retries", 0) > 0 and s.get("verify_verdict"):
+        prior_failure = t(cat, "graph.retry_prior_failure", verdict=s["verify_verdict"][:1200])
     text, d = _ask(s, cfg, agent,
-                   prompts.prompt("execute", cat, task=s["task"], joint_plan=s.get("joint_plan", "")[:2500]),
+                   prompts.prompt("execute", cat, task=s["task"], joint_plan=s.get("joint_plan", "")[:2500],
+                                  prior_failure=prior_failure),
                    "execute")
     out: dict[str, Any] = {
         "execution": text, "executor": agent, "calls": d["calls"],
