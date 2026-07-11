@@ -48,6 +48,8 @@ class S(TypedDict, total=False):
     kill_reason: str
     plans: dict
     providers_ok: int
+    plan_ranking: dict       # parallel_plan_rank (opt-in): anonymized cross-ranking of PLAN
+                              # candidates — REPORT-only signal, decide.py does not read this key
     executor: str           # logical name of the agent that produced the execution
     critique: str
     joint_plan: str
@@ -238,6 +240,128 @@ def plan(s: S, cfg: Config) -> dict:
             agg[key] += d[key]
         agg["evidence"] += d["evidence"]
     return {"plans": plans, "providers_ok": ok_count, **agg}
+
+
+def _parse_plan_ranking(text: str, labels: list[str]) -> list[str]:
+    """Extract an ordered list of ``Plan X`` labels from a ``FINAL RANKING:`` section
+    (llm-council pattern, adapted to konsey's ``Plan A/B/C`` convention). Falls back to
+    a first-seen-order scan of the whole text if the structured marker is absent.
+    Unknown/duplicate labels are dropped — a model's malformed ranking degrades
+    gracefully (Md.2.7) instead of raising."""
+    import re
+    valid = set(labels)
+    marker = "FINAL RANKING:"
+    section = text.split(marker, 1)[1] if marker in text else text
+    found = re.findall(r"\bPlan\s+([A-Z])\b", section)
+    ordered: list[str] = []
+    for label in found:
+        if label in valid and label not in ordered:
+            ordered.append(label)
+    return ordered
+
+
+def _aggregate_plan_rankings(per_agent: dict[str, dict], labels: list[str],
+                              label_to_agent: dict[str, str]) -> list[dict]:
+    """Borda-count aggregation across every ranker's parsed ordering (a naive average-
+    of-positions was flagged as naive in the konsey run that designed this feature,
+    session 28d9a879 2026-07-11 — Borda is the recommended fix). For ``n`` labels, a
+    ranker's 1st choice earns ``n`` points, 2nd earns ``n-1``, ... A label a ranker
+    failed to parse earns 0 from that ranker. Sorted best-first; ties break on label
+    for determinism."""
+    n = len(labels)
+    points: dict[str, int] = {label: 0 for label in labels}
+    ranked_by: dict[str, int] = {label: 0 for label in labels}
+    for data in per_agent.values():
+        parsed = data.get("parsed") or []
+        for i, label in enumerate(parsed):
+            if label in points:
+                points[label] += (n - i)
+                ranked_by[label] += 1
+    aggregate = [
+        {"label": label, "agent": label_to_agent.get(label),
+         "borda_points": points[label], "ranked_by": ranked_by[label]}
+        for label in labels
+    ]
+    aggregate.sort(key=lambda x: (-x["borda_points"], x["label"]))
+    return aggregate
+
+
+def rank_plans(s: S, cfg: Config) -> dict:
+    """Opt-in (``parallel_plan_rank``, default OFF), advisory-only anonymized cross-
+    ranking of PLAN-stage candidates when ``parallel_plan`` produced more than one.
+
+    Design provenance: konsey run session 28d9a879 (2026-07-11) evaluated
+    karpathy/llm-council's blind peer-ranking pattern and recommended a narrow, two-
+    phase adoption. This is **Faz 1**: the ranking is anonymized (``Plan A/B/C``,
+    producer hidden from the rankers — llm-council's core bias-reduction idea) and
+    surfaces in ``report`` only. It deliberately does **not** feed ``decide.py``'s
+    evidence-weighted score — konsey's decision explicitly warned that wiring a
+    preference/popularity signal into the evidence-primacy formula would dilute it,
+    and gated that (Faz 2, ``decide_consensus_bonus``) behind a separate, explicit
+    user approval. Do not touch decide.py from this function."""
+    if _dead(s):
+        return {}
+    k = _killcheck(s, cfg)
+    if k:
+        return k
+    if not cfg.parallel_plan_rank:
+        return {}
+    plans = s.get("plans") or {}
+    if len(plans) < 2:
+        # Nothing to rank with a single (or zero) candidate — matches plan()'s own
+        # len(leads) > 1 gate for parallel fan-out.
+        return {}
+
+    avail = available(cfg)
+    cat = load_catalog(cfg)
+
+    # Anonymize in roster/insertion order (deterministic) — never leak producer
+    # identity into the ranking prompt itself (Md. bias-reduction, llm-council Stage2).
+    items = list(plans.items())
+    labels = [chr(65 + i) for i in range(len(items))]
+    label_to_agent = {label: agent for label, (agent, _) in zip(labels, items)}
+    plans_block = "\n\n".join(
+        f"Plan {label}:\n{text[:2000]}" for label, (_, text) in zip(labels, items)
+    )
+    labels_str = ", ".join(f"Plan {label}" for label in labels)
+
+    # Rankers = every enabled, available agent (including plan producers — they can't
+    # tell which anonymized entry is their own, matching llm-council's approach).
+    rankers = [a.name for a in cfg.agents if a.enabled and avail.get(a.name)]
+    prompt_text = prompts.prompt("rank_plans", cat, task=s["task"],
+                                  plans=plans_block, labels=labels_str)
+
+    agg: dict[str, Any] = {"calls": 0, "tool_failures": 0, "evidence": []}
+    per_agent: dict[str, dict] = {}
+
+    # Reuses parallel_plan_max as the concurrency cap — this fan-out lives in the same
+    # PLAN neighborhood and a third independent _max knob would be needless surface.
+    if cfg.parallel_plan and len(rankers) > 1:
+        from concurrent.futures import ThreadPoolExecutor
+        workers = min(len(rankers), max(1, cfg.parallel_plan_max))
+        with ThreadPoolExecutor(max_workers=workers) as ex:
+            futures = {agent: ex.submit(_invoke, cfg, agent, prompt_text) for agent in rankers}
+            results = [(agent, futures[agent].result()) for agent in rankers]
+    else:
+        results = [(agent, _invoke(cfg, agent, prompt_text)) for agent in rankers]
+
+    for agent, r in results:
+        text, d = _record(s, cfg, agent, r, "rank_plans")
+        d.pop("_ok", None)
+        per_agent[agent] = {"raw": text[:1500], "parsed": _parse_plan_ranking(text, labels)}
+        for key in ("calls", "tool_failures"):
+            agg[key] += d[key]
+        agg["evidence"] += d["evidence"]
+
+    aggregate = _aggregate_plan_rankings(per_agent, labels, label_to_agent)
+    return {
+        "plan_ranking": {
+            "label_to_agent": label_to_agent,
+            "per_agent": per_agent,
+            "aggregate": aggregate,
+        },
+        **agg,
+    }
 
 
 def critique(s: S, cfg: Config) -> dict:
@@ -577,6 +701,16 @@ def report(s: S, cfg: Config) -> dict:
     if s.get("dissents"):
         lines += [t(cat, "report.dissent_heading")] + \
             [t(cat, "report.dissent_item", agent=d["agent"], rationale=d["rationale"][:300]) for d in s["dissents"]] + [""]
+    pr = s.get("plan_ranking")
+    if pr and pr.get("aggregate"):
+        # Faz 1 (parallel_plan_rank, opt-in): advisory-only anonymized cross-ranking —
+        # decide.py never reads this key, it exists purely for the human report.
+        lines += [t(cat, "report.plan_ranking_heading")]
+        for row in pr["aggregate"]:
+            lines.append(t(cat, "report.plan_ranking_item", label=row["label"],
+                           agent=row.get("agent") or "?", points=row["borda_points"],
+                           n=row["ranked_by"]))
+        lines.append("")
     yesno = t(cat, "report.human_required_yes") if dec.get("human_required") else t(cat, "report.human_required_no")
     lines += [
         t(cat, "report.decision_heading"),
@@ -615,12 +749,18 @@ def memory(s: S, cfg: Config) -> dict:
 
 
 def build(cfg: Config):
-    """Compile the 9-state graph bound to ``cfg``. Every node and the verify-router
+    """Compile the state graph bound to ``cfg``. Every node and the verify-router
     close over ``cfg`` so the roster, thresholds, owner, and locale are injected once
-    here and nowhere hard-coded (the single injection point is ``Config``)."""
+    here and nowhere hard-coded (the single injection point is ``Config``).
+
+    ``rank_plans`` (opt-in, ``parallel_plan_rank``, default OFF) sits between ``plan``
+    and ``critique`` — the 9 original states plus this Faz 1 advisory sub-step (see
+    ``rank_plans`` docstring for provenance). It is a plain pass-through no-op when the
+    flag is off, so the historical "9-state" framing still holds for the default path."""
     g = StateGraph(S)
     nodes = [
-        ("preflight", preflight), ("plan", plan), ("critique", critique),
+        ("preflight", preflight), ("plan", plan), ("rank_plans", rank_plans),
+        ("critique", critique),
         ("synthesize", synthesize), ("execute", execute), ("verify", verify),
         ("decide", decide_node), ("report", report), ("memory", memory),
     ]
@@ -628,7 +768,8 @@ def build(cfg: Config):
         g.add_node(name, (lambda f: (lambda s: f(s, cfg)))(fn))
     g.add_edge(START, "preflight")
     g.add_edge("preflight", "plan")
-    g.add_edge("plan", "critique")
+    g.add_edge("plan", "rank_plans")
+    g.add_edge("rank_plans", "critique")
     g.add_edge("critique", "synthesize")
     g.add_edge("synthesize", "execute")
     g.add_edge("execute", "verify")

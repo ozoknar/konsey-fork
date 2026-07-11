@@ -149,6 +149,10 @@ data_regime = "standard"    # standard | kvkk | gdpr | hipaa
 exec_sandbox = "off"        # off | read-only | workspace-write
 autocapture_enabled = false # opt-in; varsayılan KAPALI
 parallel_plan = false       # opt-in: PLAN sağlayıcıları eşzamanlı koş (varsayılan KAPALI)
+parallel_plan_rank = false  # opt-in: parallel_plan >1 plan ürettiğinde isimsizleştirilmiş
+                            #   çapraz-sıralama (varsayılan KAPALI). Sadece danışma/REPORT —
+                            #   decide.py bunu hiç okumaz; skora tercih sinyali eklemek ayrı,
+                            #   henüz uygulanmamış bir Faz 2 kararı (bkz. KONSEY_ANAYASASI.md)
 parallel_verify = false     # opt-in: VERIFY'yi yürütücü-dışı her ajana fan-out et (varsayılan
                             #   KAPALI); bölünmüş PASS/FAIL kararı oylanmaz, insana taşınır (Md.7)
 verify_cmd = ""             # opt-in: VERIFY'de gerçek kabul komutu; exit-code'u LLM

@@ -121,6 +121,10 @@ class Config:
     parallel_verify_max: int = 4            # concurrency cap for the VERIFY fan-out (bounded resource use)
     learn_from_repo: bool = False           # opt-in: read the target repo's lessons file into PLAN,
                                              # write a new entry when a run escalates to a human (default OFF)
+    parallel_plan_rank: bool = False        # opt-in: anonymized cross-ranking of PLAN candidates when
+                                             # parallel_plan produced >1 (default OFF; llm-council-inspired
+                                             # Faz 1, session 28d9a879 2026-07-11 — REPORT-only, decide.py
+                                             # untouched by design; see KONSEY_ANAYASASI.md decision log)
     verify_cmd: str = ""                    # opt-in: real acceptance command run at VERIFY (exit-code > LLM, Md.2.1/2.7)
     extra_path: str = field(default_factory=_default_extra_path)
     budgets: dict[str, dict[str, Any]] = field(default_factory=dict)
@@ -275,6 +279,7 @@ def load_config(path: str | os.PathLike[str] | None = None) -> Config:
         parallel_verify=bool(data.get("parallel_verify", base.parallel_verify)),
         parallel_verify_max=max(1, int(data.get("parallel_verify_max", base.parallel_verify_max))),
         learn_from_repo=bool(data.get("learn_from_repo", base.learn_from_repo)),
+        parallel_plan_rank=bool(data.get("parallel_plan_rank", base.parallel_plan_rank)),
         verify_cmd=str(data.get("verify_cmd", base.verify_cmd)) or base.verify_cmd,
         extra_path=str(data.get("extra_path", base.extra_path)) or base.extra_path,
         budgets=dict(data.get("budgets", base.budgets)),

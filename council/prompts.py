@@ -17,7 +17,7 @@ from . import i18n
 
 # State ids whose prompt text the 9-state machine resolves from the catalog.
 # These are machine identifiers (not translatable prose); the prose lives in locales/.
-PROMPT_KEYS: tuple[str, ...] = ("plan", "critique", "synthesize", "execute", "verify")
+PROMPT_KEYS: tuple[str, ...] = ("plan", "rank_plans", "critique", "synthesize", "execute", "verify")
 
 _NS = "prompts."
 

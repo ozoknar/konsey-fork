@@ -2,13 +2,24 @@
 
 > Honest scope statement (Constitution Art. 2.1 — no unverified "it works" claims).
 > Maturity: **alpha** (v0.1.0; Phase 0+1 complete, Phase 2 in progress). The core is
-> functional and tested (run `python -m pytest` for the live count — 361 as of this
+> functional and tested (run `python -m pytest` for the live count — 474 as of this
 > writing; the original v0.1.0 audit was 92/92, incl. a fresh Linux Docker install). The items in the
 > two sections below are deliberately deferred and must NOT be presented as already-complete; items that
 > have since been fixed and verified are moved down to the **Resolved** sections (with their evidence).
 
 ## EN
 
+- **`konsey audit --open` dashboard is an unimplemented stub.** `council/dashboard.py`
+  is 5 lines: a docstring reading `"""Serverless single-file HTML audit dashboard
+  (read-only).\n\nTODO Phase 2.\n"""` — no `build_html`/`main` function exists, so
+  `cli.py`'s `audit --open` path falls through to `cli.audit.dashboard_not_implemented`
+  and errors. Discovered 2026-07-11 while implementing `parallel_plan_rank` (Faz 1):
+  the konsey run that recommended that feature also recommended surfacing its output
+  "in the existing dashboard" — that recommendation assumed a working dashboard exists
+  and turned out to be wrong (the run's own read-only tool access did not happen to
+  read `dashboard.py`). The plan-ranking display therefore shipped in `report` (the
+  text output) only; the dashboard half of that recommendation is deferred until
+  `dashboard.py` itself is built.
 - **Installer UX (S3) — no live end-to-end clean-install CI job yet.** The UX kit +
   crash-resistance traps are proven by `KONSEY_UI_SELFTEST` (capability matrix + failure
   box), `sh -n`/`dash -n`, a `shellcheck -s sh` CI job, and a manual real non-TTY

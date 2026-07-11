@@ -131,6 +131,7 @@ def test_prompt_falls_back_to_canonical_with_no_catalog():
 def test_all_state_prompts_fill_their_slots():
     slots = {
         "plan": {"task": "T", "repo_lessons": ""},
+        "rank_plans": {"task": "T", "plans": "P", "labels": "Plan A, Plan B"},
         "critique": {"task": "T", "plans": "P"},
         "synthesize": {"task": "T", "plans": "P", "critique": "C"},
         "execute": {"task": "T", "joint_plan": "J", "prior_failure": ""},

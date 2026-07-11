@@ -12,6 +12,10 @@ data_regime  = "standard"    # standard | kvkk | gdpr | hipaa  (regulated → re
 exec_sandbox = "off"         # off | read-only | workspace-write
 autocapture_enabled = false  # opt-in background distillation; default OFF
 parallel_plan = false        # opt-in: run the PLAN providers concurrently; default OFF
+parallel_plan_rank = false   # opt-in: anonymized cross-ranking of PLAN candidates when
+                             #   parallel_plan produced >1; default OFF. Advisory/REPORT
+                             #   only — never wired into decide.py's score (a separate,
+                             #   un-shipped Faz 2 decision if it's ever adopted).
 parallel_verify = false      # opt-in: fan VERIFY out to every non-executor agent (not just
                              #   one); default OFF. A split PASS/FAIL verdict is NOT
                              #   majority-resolved — it escalates to a human (Art. 7).
