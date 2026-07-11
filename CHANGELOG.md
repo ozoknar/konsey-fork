@@ -15,7 +15,10 @@ unverified "it works" claims. Test evidence is cited where it backs an entry.
 - **Opt-in anonymized cross-ranking of PLAN candidates (`parallel_plan_rank`, default
   OFF; new `rank_plans` node between `plan` and `critique`).** Provenance: a konsey run
   (session `28d9a879`, 2026-07-11) evaluated karpathy/llm-council's blind peer-ranking
-  pattern and recommended a narrow, two-phase adoption — this is Faz 1. When enabled
+  pattern and recommended a narrow, two-step adoption — this is the step that shipped.
+  **Update (same day): the proposed follow-on step (below) was put to the owner and
+  explicitly CANCELLED** — `plan_ranking` is permanently REPORT-only, not revisited.
+  When enabled
   (requires `parallel_plan` and 2+ PLAN candidates), every available agent ranks the
   candidates under anonymized `Plan A/B/C` labels (producer identity hidden from the
   rankers, llm-council's core bias-reduction idea) via a `FINAL RANKING:`-terminated
@@ -23,8 +26,8 @@ unverified "it works" claims. Test evidence is cited where it backs an entry.
   aggregation was flagged as naive by the same konsey run) and surfaced in `report`
   only. **`decide.py` does not read the new `plan_ranking` key** — the run explicitly
   warned that wiring a preference/popularity signal into the evidence-weighted score
-  would dilute it, and gated that coupling (`decide_consensus_bonus`) behind a separate,
-  un-shipped Faz 2 decision requiring explicit user approval. Evidence:
+  would dilute it, and gated that coupling (`decide_consensus_bonus`) behind a separate
+  decision requiring explicit user approval — that approval was declined. Evidence:
   `tests/test_rank_plans.py` (10 tests — off-by-default, no-op with <2 candidates,
   anonymization + Borda aggregation correctness, a static guard that `decide.py` has no
   reference to `plan_ranking`). Known gap: the recommendation to also surface this in

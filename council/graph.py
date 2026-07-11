@@ -292,13 +292,15 @@ def rank_plans(s: S, cfg: Config) -> dict:
 
     Design provenance: konsey run session 28d9a879 (2026-07-11) evaluated
     karpathy/llm-council's blind peer-ranking pattern and recommended a narrow, two-
-    phase adoption. This is **Faz 1**: the ranking is anonymized (``Plan A/B/C``,
-    producer hidden from the rankers — llm-council's core bias-reduction idea) and
-    surfaces in ``report`` only. It deliberately does **not** feed ``decide.py``'s
-    evidence-weighted score — konsey's decision explicitly warned that wiring a
-    preference/popularity signal into the evidence-primacy formula would dilute it,
-    and gated that (Faz 2, ``decide_consensus_bonus``) behind a separate, explicit
-    user approval. Do not touch decide.py from this function."""
+    step adoption. This is the step that shipped: the ranking is anonymized
+    (``Plan A/B/C``, producer hidden from the rankers — llm-council's core
+    bias-reduction idea) and surfaces in ``report`` only. It deliberately does
+    **not** feed ``decide.py``'s evidence-weighted score — konsey's own decision
+    warned that wiring a preference/popularity signal into the evidence-primacy
+    formula would dilute it. The proposed follow-on (bounding that signal into
+    ``decide_consensus_bonus``) was put to the user and **explicitly cancelled**
+    (2026-07-11, same day) — ``plan_ranking`` stays permanently REPORT-only.
+    ``decide.py`` must never read this key; do not revisit that decision here."""
     if _dead(s):
         return {}
     k = _killcheck(s, cfg)

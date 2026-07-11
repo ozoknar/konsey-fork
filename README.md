@@ -147,9 +147,9 @@ autocapture_enabled = false # opt-in; default OFF
 parallel_plan = false       # opt-in: run the PLAN providers concurrently (default OFF)
 parallel_plan_rank = false  # opt-in: anonymized cross-ranking of PLAN candidates when
                             #   parallel_plan produced >1 (default OFF). Advisory/REPORT
-                            #   only — decide.py never reads this; a preference signal
-                            #   in the evidence-weighted score is a separate, un-shipped
-                            #   Faz 2 decision (see KONSEY_ANAYASASI.md decision log)
+                            #   only — decide.py never reads this; folding it into the
+                            #   score was proposed and explicitly CANCELLED by the owner
+                            #   (2026-07-11) — permanently report-only, do not revisit
 parallel_verify = false     # opt-in: fan VERIFY out to every non-executor agent (default OFF);
                             #   a split PASS/FAIL verdict escalates to a human, never voted (Art. 7)
 verify_cmd = ""             # opt-in: a real acceptance command at VERIFY; its exit code
