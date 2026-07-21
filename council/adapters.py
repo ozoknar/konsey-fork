@@ -184,8 +184,10 @@ _DEFAULT_PROFILE = CLIProfile()
 
 BUILTIN_PROFILES: dict[str, CLIProfile] = {
     # Claude: plain-text reasoning, tools off → headless determinism.
+    # --model claude-fable-5: 2026-07-20 user decision — lead node runs on Fable 5
+    # (latest Claude 5 family release) instead of the CLI's account-default model.
     "claude": CLIProfile(
-        argv_template=("{cli}", "-p", "{prompt}"),
+        argv_template=("{cli}", "--model", "claude-fable-5", "-p", "{prompt}"),
         prompt_prefix=_PLAIN_TEXT_PREFIX,
         default_timeout=180,
     ),
@@ -202,8 +204,15 @@ BUILTIN_PROFILES: dict[str, CLIProfile] = {
         default_timeout=240,
     ),
     # Gemini / Antigravity (agy): self-imposed print deadline a bit under the hard kill.
+    # --sandbox: restricts terminal/command execution so a tool call requiring the
+    # "command"/"read_file" permission is rejected by the sandbox itself rather than
+    # left pending on a prompt headless mode can never answer (proven failure mode,
+    # 2026-07-17). Known limitation: prompts that imply file reads still fail outright
+    # (read_file gets auto-denied) — only --dangerously-skip-permissions works around
+    # that, and that flag is intentionally NOT the default here (2026-07-17 user
+    # decision: opt-in per run only, reverted immediately after each such run).
     "google": CLIProfile(
-        argv_template=("{cli}", "--print-timeout", "{deadline}s", "-p", "{prompt}"),
+        argv_template=("{cli}", "--sandbox", "--print-timeout", "{deadline}s", "-p", "{prompt}"),
         timeout_slack=10,
         default_timeout=240,
     ),
