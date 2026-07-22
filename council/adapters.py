@@ -211,8 +211,18 @@ BUILTIN_PROFILES: dict[str, CLIProfile] = {
     # (read_file gets auto-denied) — only --dangerously-skip-permissions works around
     # that, and that flag is intentionally NOT the default here (2026-07-17 user
     # decision: opt-in per run only, reverted immediately after each such run).
+    # 2026-07-22: reproduced live — a task string that asks the node to "verify this
+    # yourself" (even with a KANIT block already embedded) makes the model reach for a
+    # command tool anyway, which the sandbox then silently denies (empty output, 2
+    # quorum failures in one session). A trailing no-tool instruction eliminates it:
+    # confirmed live (`agy --sandbox -p "...task ending in a no-tool instruction..."`)
+    # answers correctly instead of erroring, with no change to the sandbox/permission
+    # posture — this only steers the prompt, it does not grant anything.
     "google": CLIProfile(
-        argv_template=("{cli}", "--sandbox", "--print-timeout", "{deadline}s", "-p", "{prompt}"),
+        argv_template=("{cli}", "--sandbox", "--print-timeout", "{deadline}s", "-p",
+                       "{prompt}\n\n(Not: sandbox+headless modda tool/komut izni istenemez ve "
+                       "otomatik reddedilir. Yukarıdaki göreve SADECE verilen kanıta dayanarak "
+                       "yanıt ver — dosya okuma, komut çalıştırma veya başka bir doğrulama YAPMA.)"),
         timeout_slack=10,
         default_timeout=240,
     ),
