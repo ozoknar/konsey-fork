@@ -220,10 +220,11 @@ _DEFAULT_PROFILE = CLIProfile()
 
 BUILTIN_PROFILES: dict[str, CLIProfile] = {
     # Claude: plain-text reasoning, tools off → headless determinism.
-    # --model claude-fable-5: 2026-07-20 user decision — lead node runs on Fable 5
-    # (latest Claude 5 family release) instead of the CLI's account-default model.
+    # --model claude-opus-5: 2026-07-31 user decision — lead node runs on Opus 5
+    # instead of Fable 5 (higher-reasoning tier for the lead/plan role; Fable 5 was
+    # the 2026-07-20 choice, superseded).
     "claude": CLIProfile(
-        argv_template=("{cli}", "--model", "claude-fable-5", "-p", "{prompt}"),
+        argv_template=("{cli}", "--model", "claude-opus-5", "-p", "{prompt}"),
         prompt_prefix=_PLAIN_TEXT_PREFIX,
         default_timeout=180,
     ),
