@@ -51,6 +51,15 @@ def _env(cfg: Config, agent_name: str | None = None, temp_home: str | None = Non
             env["HOME"] = temp_home
         elif agent_name == "codex":
             env["CODEX_HOME"] = temp_home
+        elif agent_name == "kimi":
+            # kimi-code resolves its data/config root from $KIMI_CODE_HOME, falling back to
+            # ~/.kimi-code when unset. Confirmed EMPIRICALLY: `kimi doctor` reports config
+            # paths under the real ~/.kimi-code by default; `KIMI_CODE_HOME=<dir> kimi doctor`
+            # reports the identical paths under <dir> instead, and a live
+            # `KIMI_CODE_HOME=<dir> kimi -p "..."` call authenticated and answered correctly
+            # with the real $HOME untouched — same "override one dedicated env var" shape as
+            # CODEX_HOME, not google's full $HOME override.
+            env["KIMI_CODE_HOME"] = temp_home
     return env
 
 
@@ -58,9 +67,10 @@ def _env(cfg: Config, agent_name: str | None = None, temp_home: str | None = Non
 # host-instruction leak (Art. 2.6 targets CLAUDE.md/AGENTS.md/GEMINI.md/settings/MCP),
 # but a clean HOME/CODEX_HOME also strips the provider's credentials — so the node fails
 # to authenticate (codex -> HTTP 401; agy/google -> "Authentication required") and
-# silently drops out of the quorum (providers_ok < 3). These are the minimal credential
-# paths, verified empirically, that let a node auth WITHOUT pulling in any instruction
-# file. For ``google`` the ``.gemini`` dir is curated to omit exactly the three
+# silently drops out of the quorum (providers_ok short of the enabled roster size — 4
+# once kimi is added). These are the minimal credential paths, verified empirically, that
+# let a node auth WITHOUT pulling in any instruction file. For ``google`` the ``.gemini``
+# dir is curated to omit exactly the three
 # documented leak files, so isolation still holds.
 _GEMINI_LEAK_TOP = {"GEMINI.md"}
 _GEMINI_LEAK_AGCLI = {"settings.json", "mcp_config.json"}
@@ -90,6 +100,32 @@ def _seed_isolated_auth(name: str, temp_home: str) -> None:
         # ``--ignore-user-config`` already suppresses config.toml/AGENTS.md, so only the
         # credential file is restored.
         _link(real_home / ".codex" / "auth.json", temp / "auth.json")
+    elif name == "kimi":
+        # Minimal auth surface for kimi-code, mirrored 1:1 into $KIMI_CODE_HOME (== temp_home).
+        # credentials/ is a DIRECTORY (~/.kimi-code/credentials/) and device_id is a FILE
+        # (~/.kimi-code/device_id) — both symlinked whole, never copied, matching every other
+        # _link() call in this function.
+        #
+        # config.toml must ALSO be linked: verified empirically that credentials+device_id
+        # alone are NOT sufficient — a headless `KIMI_CODE_HOME=<isolated dir> kimi -p "..."`
+        # call with only those two symlinked fails immediately with "No model configured. Run
+        # `kimi` and use /login to sign in, then retry; or set default_model in config.toml."
+        # kimi's config.toml is NOT purely an instructions/leak surface (unlike codex's
+        # config.toml, already suppressed via --ignore-user-config) — it also carries
+        # default_model/provider/model-catalog data that headless -p mode hard-requires.
+        # Re-tested with all three symlinked and confirmed a live
+        # `kimi --model kimi-code/k3 -p "..."` call authenticates and answers correctly with
+        # $HOME left untouched.
+        #
+        # On this machine config.toml contains ONLY model/provider/service declarations
+        # (default_model, [providers.*], [models.*], [thinking], moonshot_search/fetch base
+        # urls) — no user-authored instructions — so linking it does not violate Article 2.6.
+        # ~/.kimi-code/AGENTS.md (a genuine host-instruction file, analogous to CLAUDE.md/
+        # GEMINI.md) does not exist on this machine today and is deliberately NOT linked here
+        # even if created later — same suppression intent as _GEMINI_LEAK_TOP for google.
+        _link(real_home / ".kimi-code" / "credentials", temp / "credentials")
+        _link(real_home / ".kimi-code" / "device_id", temp / "device_id")
+        _link(real_home / ".kimi-code" / "config.toml", temp / "config.toml")
     elif name == "google":
         # agy (Antigravity CLI) resolves creds from ``$HOME/.gemini`` PLUS the macOS login
         # keychain at ``$HOME/Library/Keychains`` (where the OAuth refresh token lives).
@@ -226,6 +262,28 @@ BUILTIN_PROFILES: dict[str, CLIProfile] = {
         timeout_slack=10,
         default_timeout=240,
     ),
+    # Kimi K3: --model pins the specific model the owner asked for (K3, not the account's
+    # current default_model) — same pinning intent as claude's "--model claude-fable-5" above.
+    # --output-format text is kimi's own documented default but made explicit for the same
+    # determinism reasons codex/google spell out their flags explicitly.
+    #
+    # The trailing no-tool instruction is NOT precautionary boilerplate — it is an
+    # empirically REQUIRED control. Verified live: a tool-tempting prompt run as
+    # `kimi -p "..." --output-format text < /dev/null` (no --yolo/--auto) executed a real `ls`
+    # shell command with NO approval gate — kimi has no --sandbox/read-only flag equivalent to
+    # codex's sandbox_mode=read-only or google's --sandbox. The SAME prompt with this trailing
+    # instruction appended made the model explicitly refrain from calling any tool and answer
+    # from static context only — reproduced live, both directions. Without this, every
+    # PLAN/CRITIQUE/VERIFY call to kimi risks live, unsandboxed command execution against the
+    # orchestrator's real cwd, violating Article 6.2 for a node meant to be reasoning-only.
+    "kimi": CLIProfile(
+        argv_template=("{cli}", "--model", "kimi-code/k3", "--output-format", "text", "-p",
+                       "{prompt}\n\n(Not: bu headless/otomatik modda tool/komut izni "
+                       "istenemez ve onaylanamaz. SADECE verilen göreve ve kanıta dayanarak "
+                       "düz metin yanıt ver — dosya okuma, komut çalıştırma veya başka bir "
+                       "doğrulama YAPMA.)"),
+        default_timeout=240,
+    ),
 }
 
 
@@ -290,7 +348,8 @@ class GenericCLIAdapter(AgentAdapter):
             temp_home = tempfile.mkdtemp(prefix=f"council-isolated-{self.name}-")
             # Re-seed credentials into the clean home so the node can authenticate
             # (auth is not an instruction-leak; without this codex 401s and agy hits
-            # "Authentication required", silently dropping the quorum below 3).
+            # "Authentication required", and kimi errors "No model configured", each silently
+            # dropping the quorum below the enabled roster size).
             _seed_isolated_auth(self.name, temp_home)
 
         try:
