@@ -50,6 +50,10 @@ KONSEY_LESSONS.md
 a2a_peers.json
 council/a2a/agent-card.json
 bin/konsey-keychain.sh
+# orchestrator's private work journal (absolute paths, real org names) — this repo's own
+# provenance/decision record lives in CHANGELOG.md + KONSEY_ANAYASASI.md instead (2026-08-03,
+# found one already-committed leak: CP-20260711-0100-parallel-plan-rank-faz1.md, untracked below)
+/.prometheus/
 
 # 5) Runtime / data / secrets — never tracked.
 *.duckdb
