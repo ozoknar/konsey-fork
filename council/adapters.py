@@ -60,6 +60,14 @@ def _env(cfg: Config, agent_name: str | None = None, temp_home: str | None = Non
             # with the real $HOME untouched — same "override one dedicated env var" shape as
             # CODEX_HOME, not google's full $HOME override.
             env["KIMI_CODE_HOME"] = temp_home
+        elif agent_name == "reasonix":
+            # reasonix resolves its data/config root from $REASONIX_HOME, falling back to
+            # ~/.reasonix when unset. Confirmed EMPIRICALLY on v1.19.3:
+            # `REASONIX_HOME=<dir> reasonix doctor --json` reports user_path/sessions under
+            # <dir>, while `HOME=<dir> reasonix doctor --json` still reports ~/.reasonix.
+            # Same "override one dedicated env var" shape as KIMI_CODE_HOME/CODEX_HOME, not
+            # google's full $HOME override.
+            env["REASONIX_HOME"] = temp_home
     return env
 
 
@@ -126,6 +134,20 @@ def _seed_isolated_auth(name: str, temp_home: str) -> None:
         _link(real_home / ".kimi-code" / "credentials", temp / "credentials")
         _link(real_home / ".kimi-code" / "device_id", temp / "device_id")
         _link(real_home / ".kimi-code" / "config.toml", temp / "config.toml")
+    elif name == "reasonix":
+        # Minimal auth/config surface for Reasonix, mirrored 1:1 into $REASONIX_HOME
+        # (== temp_home). reasonix --help documents config resolution as
+        # flag > ./reasonix.toml > <Reasonix home>/config.toml > built-in defaults and
+        # secrets via api_key_env (DEEPSEEK_API_KEY). The installed config confirms
+        # api_key_env = "DEEPSEEK_API_KEY"; the key itself is restored by linking .env, not
+        # copied or logged.
+        #
+        # config.toml must ALSO be linked so the pinned roster model name
+        # ("deepseek-flash") resolves to the local provider/model catalog. On this machine it
+        # contains provider/model/tool/permission declarations, not user-authored project
+        # instructions; ~/.reasonix/projects and ~/.reasonix/state are deliberately NOT linked.
+        _link(real_home / ".reasonix" / ".env", temp / ".env")
+        _link(real_home / ".reasonix" / "config.toml", temp / "config.toml")
     elif name == "google":
         # agy (Antigravity CLI) resolves creds from ``$HOME/.gemini`` PLUS the macOS login
         # keychain at ``$HOME/Library/Keychains`` (where the OAuth refresh token lives).
@@ -279,6 +301,18 @@ BUILTIN_PROFILES: dict[str, CLIProfile] = {
     # orchestrator's real cwd, violating Article 6.2 for a node meant to be reasoning-only.
     "kimi": CLIProfile(
         argv_template=("{cli}", "--model", "kimi-code/k3", "--output-format", "text", "-p",
+                       "{prompt}\n\n(Not: bu headless/otomatik modda tool/komut izni "
+                       "istenemez ve onaylanamaz. SADECE verilen göreve ve kanıta dayanarak "
+                       "düz metin yanıt ver — dosya okuma, komut çalıştırma veya başka bir "
+                       "doğrulama YAPMA.)"),
+        default_timeout=240,
+    ),
+    # Reasonix / DeepSeek: second-layer fallback only, after the Kimi fallback path. The
+    # profile pins the local DeepSeek preset name instead of relying on account defaults,
+    # and uses the same no-tool control as Kimi because headless -p mode has been
+    # live-tested to execute shell commands without an approval gate.
+    "reasonix": CLIProfile(
+        argv_template=("{cli}", "--model", "deepseek-flash", "--output-format", "text", "-p",
                        "{prompt}\n\n(Not: bu headless/otomatik modda tool/komut izni "
                        "istenemez ve onaylanamaz. SADECE verilen göreve ve kanıta dayanarak "
                        "düz metin yanıt ver — dosya okuma, komut çalıştırma veya başka bir "
