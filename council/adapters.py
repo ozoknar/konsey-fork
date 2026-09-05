@@ -257,7 +257,9 @@ BUILTIN_PROFILES: dict[str, CLIProfile] = {
     # read-only is correct for reasoning nodes (PLAN/CRITIQUE/VERIFY produce text only;
     # real file/command execution is the separate opt-in execute path).
     "codex": CLIProfile(
+        # 2026-09-05 model-dagilimi karari (sahip+admin): denetci=Astra (GPT-6).
         argv_template=("{cli}", "exec", "--skip-git-repo-check",
+                       "-m", "gpt-6-astra",
                        "-c", "approval_policy=never", "-c", "sandbox_mode=read-only",
                        "{prompt}"),
         default_timeout=240,
